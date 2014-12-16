@@ -208,14 +208,21 @@ static irqreturn_t k3_dma_int_handler(int irq, void *dev_id)
 				unsigned long flags;
 
 				spin_lock_irqsave(&c->vc.lock, flags);
-				vchan_cookie_complete(&p->ds_run->vd);
+				if (p->ds_run != NULL)
+					vchan_cookie_complete(&p->ds_run->vd);
 				p->ds_done = p->ds_run;
 				spin_unlock_irqrestore(&c->vc.lock, flags);
 			}
 			irq_chan |= BIT(i);
 		}
-		if (unlikely((err1 & BIT(i)) || (err2 & BIT(i))))
+		if (unlikely((err1 & BIT(i)) || (err2 & BIT(i)))) {
+			p = &d->phy[i];
+			c = p->vchan;
+			if (c)
+				c->status = DMA_ERROR;
+
 			dev_warn(d->slave.dev, "DMA ERR\n");
+		}
 	}
 
 	writel_relaxed(irq_chan, d->base + INT_TC1_RAW);
@@ -277,6 +284,11 @@ static void k3_dma_tasklet(unsigned long arg)
 				/* Mark this channel free */
 				c->phy = NULL;
 				p->vchan = NULL;
+			} else if (p && c->status == DMA_ERROR) {
+				k3_dma_terminate_chan(p, d);
+				c->phy = NULL;
+				p->vchan = NULL;
+				p->ds_run = p->ds_done = NULL;
 			}
 		}
 		spin_unlock_irq(&c->vc.lock);
