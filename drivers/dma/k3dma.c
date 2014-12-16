@@ -727,6 +727,8 @@ static int k3_dma_probe(struct platform_device *op)
 	INIT_LIST_HEAD(&d->slave.channels);
 	dma_cap_set(DMA_SLAVE, d->slave.cap_mask);
 	dma_cap_set(DMA_MEMCPY, d->slave.cap_mask);
+	op->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	op->dev.dma_mask = &op->dev.coherent_dma_mask;
 	d->slave.dev = &op->dev;
 	d->slave.device_alloc_chan_resources = k3_dma_alloc_chan_resources;
 	d->slave.device_free_chan_resources = k3_dma_free_chan_resources;
