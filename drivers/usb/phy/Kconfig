@@ -173,6 +173,14 @@ config USB_MXS_PHY
 
 	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
 
+config USB_HISI_PHY
+	tristate "hisi USB PHY support"
+	select USB_PHY
+	help
+	  Enable this to support the HISI USB PHY.
+
+	  To compile this driver as a module, choose M here.
+
 config USB_RCAR_PHY
 	tristate "Renesas R-Car USB PHY support"
 	depends on USB || USB_GADGET
