@@ -315,6 +315,10 @@ struct wl1271 {
 	struct work_struct recovery_work;
 	bool watchdog_recovery;
 
+	/* FIXME: adding u32 to make the next field 64bit alignment
+	 * see commit message to learn more
+	 */
+	u32 reserved;
 	/* Reg domain last configuration */
 	u32 reg_ch_conf_last[2];
 	/* Reg domain pending configuration */
