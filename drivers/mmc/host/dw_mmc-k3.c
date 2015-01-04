@@ -34,7 +34,7 @@ static const struct dw_mci_drv_data k3_drv_data = {
 };
 
 static const struct of_device_id dw_mci_k3_match[] = {
-	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
+        { .compatible = "hisilicon,hisi-dw-mshc", .data = &k3_drv_data, },
 	{},
 };
 MODULE_DEVICE_TABLE(of, dw_mci_k3_match);

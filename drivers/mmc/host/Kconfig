@@ -632,15 +632,15 @@ config MMC_DW_EXYNOS
 	  Synopsys DesignWare Memory Card Interface driver. Select this option
 	  for platforms based on Exynos4 and Exynos5 SoC's.
 
-config MMC_DW_K3
-	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
+config MMC_DW_HISI
+        tristate "Hisi specific extensions for Synopsys DW Memory Card Interface"
 	depends on MMC_DW
 	select MMC_DW_PLTFM
 	select MMC_DW_IDMAC
 	help
-	  This selects support for Hisilicon K3 SoC specific extensions to the
+          This selects support for Hisilicon SoC specific extensions to the
 	  Synopsys DesignWare Memory Card Interface driver. Select this option
-	  for platforms based on Hisilicon K3 SoC's.
+          for platforms based on Hisilicon SoC's.
 
 config MMC_DW_PCI
 	tristate "Synopsys Designware MCI support on PCI bus"
