@@ -1,0 +1,204 @@
+/*
+ * dts file for Hisilicon Hi6220 SoC
+ *
+ * Copyright (C) 2015, Hisilicon Ltd.
+ */
+
+#include <dt-bindings/clock/hi6220-clock.h>
+
+/ {
+	cpu-map {
+		cluster0 {
+			core0 {
+				cpu = <&cpu0>;
+			};
+			core1 {
+				cpu = <&cpu1>;
+			};
+			core2 {
+				cpu = <&cpu2>;
+			};
+			core3 {
+				cpu = <&cpu3>;
+			};
+		};
+		cluster1 {
+			core0 {
+				cpu = <&cpu4>;
+			};
+			core1 {
+				cpu = <&cpu5>;
+			};
+			core2 {
+				cpu = <&cpu6>;
+			};
+			core3 {
+				cpu = <&cpu7>;
+			};
+		};
+	};
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu0: cpu@000 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x0>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu1: cpu@001 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x1>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu2: cpu@002 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x2>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu3: cpu@003 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x3>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu4: cpu@100 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x100>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu5: cpu@101 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x101>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu6: cpu@102 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x102>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+		cpu7: cpu@103 {
+			compatible = "arm,cortex-a53", "arm,armv8";
+			device_type = "cpu";
+			reg = <0x0 0x103>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0x740fff8>;
+			clock-latency = <0>;
+		};
+	};
+
+	gic: interrupt-controller@f6800000 {
+		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+		reg = <0x0 0xf6801000 0x0 0x1000>, /* GICD */
+		      <0x0 0xf6802000 0x0 0x2000>, /* GICC */
+		      <0x0 0xf6804000 0x0 0x2000>, /* GICH */
+		      <0x0 0xf6806000 0x0 0x2000>; /* GICV */
+		#interrupt-cells = <3>;
+		#address-cells = <0>;
+		interrupt-controller;
+	};
+
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupt-parent = <&gic>;
+		interrupts = <1 13 0xff08>,
+			     <1 14 0xff08>,
+			     <1 11 0xff08>,
+			     <1 10 0xff08>;
+		clock-frequency = <1200000>;
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		interrupt-parent = <&gic>;
+		ranges;
+
+		ao_ctrl: ao_ctrl {
+			compatible = "hisilicon,aoctrl", "syscon";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x0 0xf7800000 0x0 0x2000>;
+			ranges = <0 0x0 0xf7800000 0x2000>;
+
+			clock_ao: clock0@0 {
+				compatible = "hisilicon,hi6220-clock-ao";
+				reg = <0 0x1000>;
+				#clock-cells = <1>;
+			};
+		};
+
+		sys_ctrl: sys_ctrl {
+			compatible = "hisilicon,sysctrl", "syscon";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x0 0xf7030000 0x0 0x2000>;
+			ranges = <0 0x0 0xf7030000 0x2000>;
+
+			clock_sys: clock1@0 {
+				compatible = "hisilicon,hi6220-clock-sys";
+				reg = <0 0x1000>;
+				#clock-cells = <1>;
+			};
+		};
+
+		media_ctrl: media_ctrl {
+			compatible = "hisilicon,mediactrl", "syscon";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x0 0xf4410000 0x0 0x1000>;
+			ranges = <0 0x0 0xf4410000 0x1000>;
+
+			clock_media: clock2@0 {
+				compatible = "hisilicon,hi6220-clock-media";
+				reg = <0 0x1000>;
+				#clock-cells = <1>;
+			};
+		};
+
+		pm_ctrl: pm_ctrl {
+			compatible = "hisilicon,pmctrl", "syscon";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x0 0xf7032000 0x0 0x1000>;
+			ranges = <0 0x0 0xf7032000 0x1000>;
+
+			clock_power: clock3@0 {
+				compatible = "hisilicon,hi6220-clock-power";
+				reg = <0 0x1000>;
+				#clock-cells = <1>;
+			};
+		};
+
+		uart0: uart@f8015000 {	/* console */
+			compatible = "arm,pl011", "arm,primecell";
+			reg = <0x0 0xf8015000 0x0 0x1000>;
+			interrupts = <0 36 4>;
+			clocks = <&clock_ao HI6220_UART0_PCLK>, <&clock_ao HI6220_UART0_PCLK>;
+			clock-names = "uartclk", "apb_pclk";
+		};
+	};
+};

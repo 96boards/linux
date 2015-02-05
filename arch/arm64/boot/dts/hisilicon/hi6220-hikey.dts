@@ -1,0 +1,31 @@
+/*
+ * dts file for Hisilicon HiKey Development Board
+ *
+ * Copyright (C) 2015, Hisilicon Ltd.
+ *
+ */
+
+/dts-v1/;
+
+/memreserve/ 0x0740f000 0x1000;
+
+#include "hi6220.dtsi"
+
+/ {
+	model = "HiKey Development Board";
+	compatible = "hisilicon,hi6220-hikey";
+	#address-cells = <2>;
+	#size-cells = <2>;
+	interrupt-parent = <&gic>;
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen { };
+
+	memory@7400000 {
+		device_type = "memory";
+		reg = <0x0 0x07400000 0x0 0x38c00000>;
+	};
+};

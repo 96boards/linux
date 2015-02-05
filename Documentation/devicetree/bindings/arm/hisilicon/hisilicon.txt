@@ -13,6 +13,9 @@ HiP01 ca9x2 Board
 Required root node properties:
 	- compatible = "hisilicon,hip01-ca9x2";
 
+HiKey Board
+Required root node properties:
+	- compatible = "hisilicon,hi6220-hikey";
 
 Hisilicon system controller
 
@@ -85,6 +88,36 @@ Example:
 		compatible = "hisilicon,pctrl";
 		reg = <0xfca09000 0x1000>;
 	};
+
+-----------------------------------------------------------------------
+Hisilicon Power Always ON domain controller
+
+Required properties:
+- compatible : "hisilicon,aoctrl"
+- reg : Register address and size
+
+Some clock registers are defined in power always on system controller,
+especially in Hi6220 SoC which is used for mobile platform.
+
+-----------------------------------------------------------------------
+Hisilicon Media domain controller
+
+Required properties:
+- compatible : "hisilicon,mediactrl"
+- reg : Register address and size
+
+Some clock registers of media module are defined in media system
+controller, especially in Hi6220 SoC which is used for mobile platform.
+
+-----------------------------------------------------------------------
+Hisilicon Power Management domain controller
+
+Required properties:
+- compatible : "hisilicon,pmctrl"
+- reg : Register address and size
+
+Some clock registers and PMU registers are defined in power management
+controller, especially in Hin6220 SoC which is used for mobile platform.
 
 -----------------------------------------------------------------------
 Fabric:
