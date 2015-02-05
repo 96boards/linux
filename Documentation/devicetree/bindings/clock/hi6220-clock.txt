@@ -1,0 +1,30 @@
+* Hisilicon Hi6220 Clock Controller
+
+The hi6220 clock controller generates and supplies clock to various
+controllers within the hi6220 SoC.
+
+Required Properties:
+
+- compatible: should be one of the following:
+  - "hisilicon,hi6220-clock-ao" - controller for those clocks under SoC
+     power always on(AO) domain, it is the sub node of SoC power AO
+     controller in dts file.
+  - "hisilicon,hi6220-clock-sys" - controller for those clocks under SoC
+     system control domain, it is the sub node of SoC system controller
+     in dts file.
+  - "hisilicon,hi6220-clock-media" - controller for those clocks under
+     SoC media control domain, it is the sub node of SoC media controller
+     in dts file.
+  - "hisilicon,hi6220-clock-power" - controller for those clocks under
+     SoC power control domain, it is the sub node of SoC power controller
+     in dts file.
+
+- reg: physical base address of the controller and length of memory mapped
+  region.
+
+- #clock-cells: should be 1.
+
+Each clock is assigned an identifier and client nodes use this identifier
+to specify the clock which they consume.
+
+All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.

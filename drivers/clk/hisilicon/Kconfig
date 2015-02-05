@@ -1,0 +1,5 @@
+config COMMON_CLK_HI6220
+	tristate "Hi6220 Clock Driver"
+	depends on OF && ARCH_HISI
+	help
+	  Build the Hisilicon Hi6220 clock driver based on the common clock framework.

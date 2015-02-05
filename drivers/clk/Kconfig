@@ -145,6 +145,8 @@ config COMMON_CLK_CDCE706
 
 source "drivers/clk/qcom/Kconfig"
 
+source "drivers/clk/hisilicon/Kconfig"
+
 endmenu
 
 source "drivers/clk/bcm/Kconfig"
