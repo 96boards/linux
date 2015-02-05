@@ -230,6 +230,10 @@ config ARCH_XGENE
 
 config ARCH_HISI
 	bool "Hisilicon SoC Family"
+	select PINCTRL
+	select PINCTRL_SINGLE
+	select ARCH_REQUIRE_GPIOLIB
+	select GPIO_PL061
 	select COMMON_CLK_HI6220
 	select MFD_HI655X_PMIC
 	select REGULATOR_HI655X
