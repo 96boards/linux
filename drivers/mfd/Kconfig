@@ -1378,6 +1378,13 @@ config MFD_STW481X
 	  in various ST Microelectronics and ST-Ericsson embedded
 	  Nomadik series.
 
+config MFD_HI655X_PMIC
+	tristate "HiSilicon Hi655X series pmic driver"
+	depends on ARCH_HISI
+	select MFD_CORE
+	help
+	  Select this option to enable Hisilicon hi655x series pmic driver.
+
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
