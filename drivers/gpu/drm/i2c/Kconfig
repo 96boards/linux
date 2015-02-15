@@ -1,6 +1,12 @@
 menu "I2C encoder or helper chips"
      depends on DRM && DRM_KMS_HELPER && I2C
 
+config DRM_I2C_ADV7533
+	tristate "ADV7533 encoder"
+	select REGMAP_I2C
+	help
+	  Support for the Analog Device ADV7533 HDMI encoders.
+
 config DRM_I2C_CH7006
 	tristate "Chrontel ch7006 TV encoder"
 	default m if DRM_NOUVEAU

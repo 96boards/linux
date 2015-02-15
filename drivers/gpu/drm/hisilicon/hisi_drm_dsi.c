@@ -571,7 +571,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	 * Hline_time = (HSA+HBP+HACT+HFP)*(PCLK period/Clk Lane Byte Period);
 	*/
 
-	pixel_clk = dsi->vm.pixelclock / 1000;
+	pixel_clk = dsi->vm.pixelclock;
 	hsa_time = dsi->vm.hsync_len * phy_register.lane_byte_clk / pixel_clk;
 	hbp_time = dsi->vm.hback_porch * phy_register.lane_byte_clk / pixel_clk;
 	hline_time  = (dsi->vm.hsync_len + dsi->vm.hback_porch +
@@ -581,6 +581,8 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_VID_HBP_TIME(hbp_time);
 	set_MIPIDSI_VID_HLINE_TIME(hline_time);
 
+	DRM_INFO("%s,pixcel_clk=%d,dphy_freq=%d,hsa=%d,hbp=%d,hline=%d", __func__,
+			pixel_clk, dsi->dphy_freq, hsa_time, hbp_time, hline_time);
 	/*
 	 * 5. Define the Vertical line configuration:
 	 *
@@ -750,7 +752,7 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	vm->pixelclock = mode->clock;
+	vm->pixelclock = mode->clock/1000;
 	vm->hactive = mode->hdisplay;
 	vm->vactive = mode->vdisplay;
 	vm->vfront_porch = mode->vsync_start - mode->vdisplay;
@@ -759,6 +761,9 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	vm->hfront_porch = mode->hsync_start - mode->hdisplay;
 	vm->hback_porch = mode->htotal - mode->hsync_end;
 	vm->hsync_len = mode->hsync_end - mode->hsync_start;
+
+	/* laneBitRate >= pixelClk*24/lanes */
+	dsi->dphy_freq = vm->pixelclock*24/dsi->lanes; /*  + 30; */
 
 	vm->flags = 0;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
@@ -816,7 +821,7 @@ hisi_dsi_detect(struct drm_connector *connector, bool force)
 		status = sfuncs->detect(encoder, connector);
 
 	DRM_DEBUG_DRIVER("exit success. status=%d\n", status);
-	return connector_status_connected;
+	return status;
 }
 
 static void hisi_dsi_connector_destroy(struct drm_connector *connector)
@@ -866,13 +871,16 @@ static int hisi_dsi_get_modes(struct drm_connector *connector)
 	struct drm_encoder *encoder = &dsi->base.base;
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
 	int count = 0;
-
+#if 1
 	DRM_DEBUG_DRIVER("enter.\n");
 	if (sfuncs && sfuncs->get_modes)
 		count = sfuncs->get_modes(encoder, connector);
 
 	DRM_DEBUG_DRIVER("exit success. count=%d\n", count);
+	return count;
+#else
 	return hisi_get_default_modes(connector);
+#endif
 }
 
 static struct drm_encoder *
@@ -912,6 +920,7 @@ static int hisi_drm_encoder_create(struct drm_device *dev, struct hisi_dsi *dsi)
 {
 	/* int ret; */
 	struct drm_encoder *encoder = &dsi->base.base;
+	int ret;
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	dsi->dpms = DRM_MODE_DPMS_OFF;
@@ -919,7 +928,6 @@ static int hisi_drm_encoder_create(struct drm_device *dev, struct hisi_dsi *dsi)
 	drm_encoder_init(dev, encoder, &hisi_encoder_funcs, DRM_MODE_ENCODER_DSI);
 	drm_encoder_helper_add(encoder, &hisi_encoder_helper_funcs);
 
-#if 0
 	ret = dsi->drm_i2c_driver->encoder_init(dsi->client, dev, &dsi->base);
 	if (ret) {
 		DRM_ERROR("drm_i2c_encoder_init error\n");
@@ -930,7 +938,7 @@ static int hisi_drm_encoder_create(struct drm_device *dev, struct hisi_dsi *dsi)
 		DRM_ERROR("failed check encoder function\n");
 		return -ENODEV;
 	}
-#endif
+
 	return 0;
 	DRM_DEBUG_DRIVER("exit success.\n");
 }
@@ -957,10 +965,8 @@ static int hisi_dsi_probe(struct platform_device *pdev)
 	struct hisi_dsi *dsi;
 	struct resource *res;
 	struct drm_device *dev = dev_get_platdata(&pdev->dev);
-#if 0
 	struct device_node *slave_node;
 	struct device_node *np = pdev->dev.of_node;
-#endif
 
 	DRM_DEBUG_DRIVER("enter.\n");
 
@@ -992,7 +998,6 @@ static int hisi_dsi_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "failed to get vc");
 
-#if 0
 	slave_node = of_parse_phandle(np, "encoder-slave", 0);
 	if (!slave_node) {
 		DRM_ERROR("failed to get slave encoder node\n");
@@ -1012,7 +1017,6 @@ static int hisi_dsi_probe(struct platform_device *pdev)
 		DRM_ERROR("failed initialize encoder driver\n");
 		return -EPROBE_DEFER;
 	}
-#endif
 
 	dsi->color_mode = DSI_24BITS_1;
 	dsi->date_enable_pol = 0;
