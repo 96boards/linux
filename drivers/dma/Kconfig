@@ -360,7 +360,7 @@ config DMA_JZ4740
 
 config K3_DMA
 	tristate "Hisilicon K3 DMA support"
-	depends on ARCH_HI3xxx
+	depends on ARCH_HISI
 	select DMA_ENGINE
 	select DMA_VIRTUAL_CHANNELS
 	help
