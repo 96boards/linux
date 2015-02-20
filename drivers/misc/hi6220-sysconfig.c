@@ -9,6 +9,7 @@
 
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <asm/io.h>
 
 #define reset_offset 0x334
 #define pclk_offset 0x230
