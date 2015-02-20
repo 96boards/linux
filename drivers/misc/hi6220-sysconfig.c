@@ -58,7 +58,7 @@ static int __init hi6220_sysconf(void)
         writel(BIT(8), base + pclk_offset);
 
 	/*unreset microSD*/
-	writel(readl(base+0x304) | 0x6, base + 0x304);
+//	writel(readl(base+0x304) | 0x6, base + 0x304);
 
 	/*enable clk for BT/WIFI*/
 	ret = *(volatile unsigned char*)PMUSSI_REG_EX(base1, 0x1c);
