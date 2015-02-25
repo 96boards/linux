@@ -564,7 +564,9 @@ static int dw_mci_idmac_init(struct dw_mci *host)
 		for (i = 0, p = host->sg_cpu; i < host->ring_size - 1; i++, p++) {
 			p->des3 = host->sg_dma + (sizeof(struct idmac_desc) *
 								(i + 1));
-			p->des1 = 0;
+			/* Initialize reserved field to "0" */
+ 			p->des1 = 0;
+			p->des2 = 0;
 		}
 
 		/* Set the last descriptor as the end-of-ring descriptor */
