@@ -23,7 +23,7 @@
 struct adv7533 {
 	struct i2c_client *i2c_main;
 	struct i2c_client *i2c_edid;
-	struct i2c_client *i2c_cec;
+	struct i2c_client *i2c_dsi;
 
 	struct regmap *regmap_main;
 	struct regmap *regmap_dsi;
@@ -57,7 +57,7 @@ static const struct reg_default adv7533_fixed_registers[] = {
 	{ 0xe5, 0x80 },
 };
 
-static const struct reg_default adv7533_cec_fixed_registers[] = {
+static const struct reg_default adv7533_dsi_fixed_registers[] = {
 	{ 0x15, 0x10 },
 	{ 0x17, 0xd0 },
 	{ 0x24, 0x20 },
@@ -78,7 +78,7 @@ static const struct regmap_config adv7533_main_regmap_config = {
 #endif
 };
 
-static const struct regmap_config adv7533_cec_regmap_config = {
+static const struct regmap_config adv7533_dsi_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 
@@ -94,7 +94,7 @@ static struct adv7533 *encoder_to_adv7533(struct drm_encoder *encoder)
 
 static const int edid_i2c_addr = 0x7e;
 static const int packet_i2c_addr = 0x70;
-static const int cec_i2c_addr = 0x78;
+static const int dsi_i2c_addr = 0x78;
 
 static const struct of_device_id adv7533_of_ids[] = {
 	{ .compatible = "adi,adv7533"},
@@ -235,7 +235,6 @@ static void adv7533_set_config_csc(struct adv7533 *adv7533,
 	}
 
 	DRM_INFO("HDMI: mode=%d,format_422=%d,format_ycbcr=%d\n", mode, output_format_422, output_format_ycbcr);
-#if 1
 	adv7533_packet_disable(adv7533, ADV7533_PACKET_ENABLE_AVI_INFOFRAME);
 
 	adv7533_set_colormap(adv7533, config.csc_enable,
@@ -256,7 +255,6 @@ static void adv7533_set_config_csc(struct adv7533 *adv7533,
 			  infoframe + 1, sizeof(infoframe) - 1);
 
 	adv7533_packet_enable(adv7533, ADV7533_PACKET_ENABLE_AVI_INFOFRAME);
-#endif
 }
 
 
@@ -636,7 +634,7 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	regmap_write(adv7533->regmap_main, ADV7533_REG_EDID_I2C_ADDR, edid_i2c_addr);
 	regmap_write(adv7533->regmap_main, ADV7533_REG_PACKET_I2C_ADDR,
 		     packet_i2c_addr);
-	regmap_write(adv7533->regmap_main, ADV7533_REG_CEC_I2C_ADDR, cec_i2c_addr);
+	regmap_write(adv7533->regmap_main, ADV7533_REG_CEC_I2C_ADDR, dsi_i2c_addr);
 	adv7533_packet_disable(adv7533, 0xffff);
 
 	adv7533->i2c_main = i2c;
@@ -644,21 +642,21 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	if (!adv7533->i2c_edid)
 		return -ENOMEM;
 
-	adv7533->i2c_cec = i2c_new_dummy(i2c->adapter, cec_i2c_addr >> 1);
-	if (!adv7533->i2c_cec) {
+	adv7533->i2c_dsi = i2c_new_dummy(i2c->adapter, dsi_i2c_addr >> 1);
+	if (!adv7533->i2c_dsi) {
 		ret = -ENOMEM;
 		goto err_i2c_unregister_edid;
 	}
 
-	adv7533->regmap_dsi = devm_regmap_init_i2c(adv7533->i2c_cec,
-		&adv7533_cec_regmap_config);
+	adv7533->regmap_dsi = devm_regmap_init_i2c(adv7533->i2c_dsi,
+		&adv7533_dsi_regmap_config);
 	if (IS_ERR(adv7533->regmap_dsi)) {
 		ret = PTR_ERR(adv7533->regmap_dsi);
-		goto err_i2c_unregister_cec;
+		goto err_i2c_unregister_dsi;
 	}
 
-	ret = regmap_register_patch(adv7533->regmap_main, adv7533_cec_fixed_registers,
-				    ARRAY_SIZE(adv7533_cec_fixed_registers));
+	ret = regmap_register_patch(adv7533->regmap_dsi, adv7533_dsi_fixed_registers,
+				    ARRAY_SIZE(adv7533_dsi_fixed_registers));
 	if (ret)
 		return ret;
 
@@ -670,7 +668,7 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 						IRQF_ONESHOT, dev_name(dev),
 						adv7533);
 		if (ret)
-			goto err_i2c_unregister_cec;
+			goto err_i2c_unregister_dsi;
 	}
 
 	/* CEC is unused for now */
@@ -687,8 +685,8 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	DRM_DEBUG_DRIVER("exit success.\n");
 	return 0;
 
-err_i2c_unregister_cec:
-	i2c_unregister_device(adv7533->i2c_cec);
+err_i2c_unregister_dsi:
+	i2c_unregister_device(adv7533->i2c_dsi);
 err_i2c_unregister_edid:
 	i2c_unregister_device(adv7533->i2c_edid);
 
@@ -699,7 +697,7 @@ static int adv7533_remove(struct i2c_client *i2c)
 {
 	struct adv7533 *adv7533 = i2c_get_clientdata(i2c);
 
-	i2c_unregister_device(adv7533->i2c_cec);
+	i2c_unregister_device(adv7533->i2c_dsi);
 	i2c_unregister_device(adv7533->i2c_edid);
 
 	return 0;
