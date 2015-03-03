@@ -46,6 +46,8 @@
 #define DSI_BURST_MODE    DSI_NON_BURST_SYNC_PULSES
 #define ROUND(x, y) ((x) / (y) + ((x) % (y) * 10 / (y) >= 5 ? 1 : 0))
 
+//#define USE_DEFAULT_720P_MODE 1
+
 u8 *reg_base_mipi_dsi;
 
 
@@ -762,8 +764,10 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	vm->hback_porch = mode->htotal - mode->hsync_end;
 	vm->hsync_len = mode->hsync_end - mode->hsync_start;
 
+#if USE_DEFAULT_720P_MODE != 1
 	/* laneBitRate >= pixelClk*24/lanes */
 	dsi->dphy_freq = vm->pixelclock*24/dsi->lanes; /*  + 30; */
+#endif
 
 	vm->flags = 0;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
@@ -840,6 +844,7 @@ static struct drm_connector_funcs hisi_dsi_connector_funcs = {
 static int hisi_get_default_modes(struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
+	struct hisi_dsi *dsi = connector_to_dsi(connector);
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	mode = drm_mode_create(connector->dev);
@@ -862,6 +867,7 @@ static int hisi_get_default_modes(struct drm_connector *connector)
 	mode->flags = 0xa;
 	drm_mode_probed_add(connector, mode);
 
+	dsi->dphy_freq = 640; /*  640M for 720p */
 	DRM_DEBUG_DRIVER("exit successfully.\n");
 	return 1;
 }
@@ -871,12 +877,13 @@ static int hisi_dsi_get_modes(struct drm_connector *connector)
 	struct drm_encoder *encoder = &dsi->base.base;
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
 	int count = 0;
-#if 1
+
 	DRM_DEBUG_DRIVER("enter.\n");
 	if (sfuncs && sfuncs->get_modes)
 		count = sfuncs->get_modes(encoder, connector);
 
 	DRM_DEBUG_DRIVER("exit success. count=%d\n", count);
+#if USE_DEFAULT_720P_MODE != 1
 	return count;
 #else
 	return hisi_get_default_modes(connector);
@@ -901,6 +908,11 @@ static int hisi_drm_connector_mode_valid(struct drm_connector *connector,
 	struct drm_encoder *encoder = &dsi->base.base;
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
 	int ret = MODE_OK;
+
+#if USE_DEFAULT_720P_MODE
+	if (mode->vdisplay != 720)
+		return MODE_ONE_SIZE;
+#endif
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	if (sfuncs && sfuncs->mode_valid)
@@ -989,10 +1001,6 @@ static int hisi_dsi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to remap io region\n");
 		ret = PTR_ERR(dsi->reg_base);
 	}
-
-	ret = of_property_read_u32(pdev->dev.of_node, "dsi_bit_clk_rate", &dsi->dphy_freq);
-	if (ret)
-		dev_err(&pdev->dev, "failed to get dsi_bit_clk_rate");
 
 	ret = of_property_read_u32(pdev->dev.of_node, "vc", &dsi->vc);
 	if (ret)

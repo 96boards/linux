@@ -722,7 +722,6 @@
 				reg = <0x0 0xf4107800 0x0 0x100>;
 				clocks = <&clock_media  HI6220_DSI_PCLK>;
 				clock-names = "pclk_dsi";
-				dsi_bit_clk_rate = <640>;
 				vc = <0>;
 				encoder-slave = <&adv7533>;
 			};
