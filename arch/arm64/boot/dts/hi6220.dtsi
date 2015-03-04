@@ -22,6 +22,8 @@
 			device_type = "cpu";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
+			clocks = <&clock_acpu HI6220_STUB_ACPU0>;
+			clock-names = "acpu0";
 			clock-latency = <0>;
 			operating-points = <
 				/* kHz */
@@ -60,16 +62,6 @@
 			device_type = "cpu";
 			reg = <0x0 0x100>;
 			enable-method = "psci";
-			clock-latency = <0>;
-			operating-points = <
-				/* kHz */
-				1200000  0
-				960000   0
-				729000   0
-				432000   0
-				208000   0
-			>;
-			#cooling-cells = <2>; /* min followed by max */
 		};
 
 		cpu5: cpu@5 {
