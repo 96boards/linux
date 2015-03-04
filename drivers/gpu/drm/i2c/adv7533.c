@@ -437,7 +437,8 @@ static int adv7533_get_modes(struct drm_encoder *encoder,
 		adv7533->current_edid_segment = -1;
 	}
 
-	edid = drm_get_edid(connector, adv7533->i2c_edid->adapter);
+	edid = drm_do_get_edid(connector, adv7533_get_edid_block, adv7533);
+	/* edid = drm_get_edid(connector, adv7533->i2c_edid->adapter); */
 
 	if (adv7533->dpms_mode != DRM_MODE_DPMS_ON)
 		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER,
