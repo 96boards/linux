@@ -97,8 +97,8 @@ static int hisi_drm_load(struct drm_device *drm_dev, unsigned long flags)
 	int ret;
 	struct hisi_drm_private *private;
 
-	/* debug setting */
-	drm_debug = DRM_UT_DRIVER|DRM_UT_KMS|DRM_UT_CORE|DRM_UT_PRIME;
+	/* debug setting
+	drm_debug = DRM_UT_DRIVER|DRM_UT_KMS|DRM_UT_CORE|DRM_UT_PRIME; */
 	DRM_DEBUG_DRIVER("enter.\n");
 
 	private = kzalloc(sizeof(struct hisi_drm_private), GFP_KERNEL);

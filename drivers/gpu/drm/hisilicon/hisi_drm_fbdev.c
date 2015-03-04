@@ -238,7 +238,7 @@ static int hisi_drm_fbdev_probe(struct drm_fb_helper *helper,
 	mode_cmd.pitches[0] = sizes->surface_width * bytes_per_pixel;
 	mode_cmd.pixel_format = DRM_FORMAT_RGBA8888;
 
-	size = mode_cmd.pitches[0] * mode_cmd.height;
+	size = roundup(mode_cmd.pitches[0] * mode_cmd.height, PAGE_SIZE);
 	obj = drm_gem_cma_create(dev, size);
 	if (IS_ERR(obj))
 		return -ENOMEM;

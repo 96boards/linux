@@ -46,7 +46,7 @@
 #define DSI_BURST_MODE    DSI_NON_BURST_SYNC_PULSES
 #define ROUND(x, y) ((x) / (y) + ((x) % (y) * 10 / (y) >= 5 ? 1 : 0))
 
-//#define USE_DEFAULT_720P_MODE 1
+#define USE_DEFAULT_720P_MODE 1
 
 u8 *reg_base_mipi_dsi;
 
@@ -764,10 +764,8 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	vm->hback_porch = mode->htotal - mode->hsync_end;
 	vm->hsync_len = mode->hsync_end - mode->hsync_start;
 
-#if USE_DEFAULT_720P_MODE != 1
 	/* laneBitRate >= pixelClk*24/lanes */
-	dsi->dphy_freq = vm->pixelclock*24/dsi->lanes; /*  + 30; */
-#endif
+	dsi->dphy_freq = vm->pixelclock*24/dsi->lanes + 20;
 
 	vm->flags = 0;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
@@ -781,7 +779,8 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 
 	if (sfuncs && sfuncs->mode_set)
 		sfuncs->mode_set(encoder, mode, adjusted_mode);
-	DRM_DEBUG_DRIVER("exit success.\n");
+	DRM_DEBUG_DRIVER("exit success: pixelclk=%d,dphy_freq=%d\n",
+			(u32)vm->pixelclock, dsi->dphy_freq);
 }
 
 static void hisi_drm_encoder_prepare(struct drm_encoder *encoder)
@@ -841,10 +840,10 @@ static struct drm_connector_funcs hisi_dsi_connector_funcs = {
 	.destroy = hisi_dsi_connector_destroy
 };
 
+#if USE_DEFAULT_720P_MODE
 static int hisi_get_default_modes(struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
-	struct hisi_dsi *dsi = connector_to_dsi(connector);
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	mode = drm_mode_create(connector->dev);
@@ -867,10 +866,11 @@ static int hisi_get_default_modes(struct drm_connector *connector)
 	mode->flags = 0xa;
 	drm_mode_probed_add(connector, mode);
 
-	dsi->dphy_freq = 640; /*  640M for 720p */
 	DRM_DEBUG_DRIVER("exit successfully.\n");
 	return 1;
 }
+#endif
+
 static int hisi_dsi_get_modes(struct drm_connector *connector)
 {
 	struct hisi_dsi *dsi = connector_to_dsi(connector);
@@ -883,10 +883,10 @@ static int hisi_dsi_get_modes(struct drm_connector *connector)
 		count = sfuncs->get_modes(encoder, connector);
 
 	DRM_DEBUG_DRIVER("exit success. count=%d\n", count);
-#if USE_DEFAULT_720P_MODE != 1
-	return count;
-#else
+#if USE_DEFAULT_720P_MODE
 	return hisi_get_default_modes(connector);
+#else
+	return count;
 #endif
 }
 

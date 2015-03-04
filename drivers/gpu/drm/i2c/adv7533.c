@@ -447,8 +447,10 @@ static int adv7533_get_modes(struct drm_encoder *encoder,
 
 	adv7533->edid = edid;
 	adv7533_set_config_csc(adv7533, connector, true); /*  adv7533->rgb); */
-	if (!edid)
+	if (!edid) {
+		DRM_INFO("May has one empty edid block!\n");
 		return 0;
+	}
 
 	drm_mode_connector_update_edid_property(connector, edid);
 	count = drm_add_edid_modes(connector, edid);
@@ -508,7 +510,7 @@ static void adv7533_encoder_dpms(struct drm_encoder *encoder, int mode)
 		regcache_mark_dirty(adv7533->regmap_main);
 		break;
 	}
-	
+
 	/* dsi receiver dpms */
 	adv7533_dsi_receiver_dpms(adv7533, mode);
 	adv7533->dpms_mode = mode;
