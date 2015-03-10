@@ -230,8 +230,7 @@
 		nshutdown_gpio = <503>;
 		dev_name = "/dev/ttyAMA1";
 		flow_cntrl = <1>;
-		/* baud_rate = <3000000>; */
-		baud_rate = <115200>;
+		baud_rate = <3000000>;
 	};
 
 	btwilink {
