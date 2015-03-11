@@ -230,6 +230,7 @@
 			compatible = "arm,pl011", "arm,primecell";
 			reg = <0x0 0xf8015000 0x0 0x1000>;
 			interrupts = <0 36 4>;
+			clock-freq-high = <0>;
 			clocks = <&clock_ao HI6220_UART0_PCLK>;
 			clock-names = "apb_pclk";
 			status = "disabled";
@@ -253,6 +254,7 @@
 			reg = <0x0 0xf7112000 0x0 0x1000>;
 			interrupts = <0 38 4>;
 			reset-controller-reg = <0x330 0x334 0x338 6>;
+			clock-freq-high = <0>;
 			clocks = <&clock_sys HI6220_UART2_PCLK>;
 			clock-names = "apb_pclk";
 			clk-enable-flag = <0>;
@@ -265,6 +267,7 @@
 			reg = <0x0 0xf7113000 0x0 0x1000>;
 			interrupts = <0 39 4>;
 			reset-controller-reg = <0x330 0x334 0x338 7>;
+			clock-freq-high = <0>;
 			clocks = <&clock_sys HI6220_UART3_PCLK>;
 			clock-names = "apb_pclk";
 			clk-enable-flag = <0>;
@@ -277,6 +280,7 @@
 			reg = <0x0 0xf7114000 0x0 0x1000>;
 			interrupts = <0 40 4>;
 			reset-controller-reg = <0x330 0x334 0x338 8>;
+			clock-freq-high = <0>;
 			clocks = <&clock_sys HI6220_UART4_PCLK>;
 			clock-names = "apb_pclk";
 			clk-enable-flag = <0>;

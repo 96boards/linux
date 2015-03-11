@@ -47,6 +47,7 @@
 #include <linux/amba/bus.h>
 #include <linux/amba/serial.h>
 #include <linux/clk.h>
+#include <linux/clk-private.h>
 #include <linux/slab.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -148,6 +149,7 @@ struct pl011_dmatx_data {
 struct uart_amba_port {
 	struct uart_port	port;
 	struct clk		*clk;
+	struct clk              *parent_clk;
 	const struct vendor_data *vendor;
 	unsigned int		dmacr;		/* dma control reg */
 	unsigned int		im;		/* interrupt mask */
@@ -158,6 +160,7 @@ struct uart_amba_port {
 	unsigned int		old_cr;		/* state during shutdown */
 	bool			autorts;
 	char			type[12];
+	unsigned int            clkin_high;
 #ifdef CONFIG_DMA_ENGINE
 	/* DMA stuff */
 	bool			using_tx_dma;
@@ -2140,6 +2143,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 {
 	struct uart_amba_port *uap;
 	struct vendor_data *vendor = id->data;
+	struct clk *clk_parent = NULL;
 	void __iomem *base;
 	int i, ret;
 
@@ -2165,6 +2169,28 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	uap->clk = devm_clk_get(&dev->dev, NULL);
 	if (IS_ERR(uap->clk))
 		return PTR_ERR(uap->clk);
+
+	/* clk switch for high BAUD*/
+	ret = of_property_read_u32_array(dev->dev.of_node, "clock-freq-high",
+					&uap->clkin_high, 1);
+	if(ret) {
+		dev_err(&dev->dev,"%s doesn't have clock-freq-high property!\n",
+			__func__);
+	}
+
+	if(uap->clkin_high) {
+		uap->parent_clk = clk_get_parent(uap->clk);
+		if (IS_ERR_OR_NULL(uap->parent_clk))
+			return PTR_ERR(uap->parent_clk);
+
+		clk_parent = clk_get_parent_by_index(uap->parent_clk, 1);
+		if (IS_ERR_OR_NULL(clk_parent))
+			return PTR_ERR(clk_parent);
+
+		ret = clk_set_parent(uap->parent_clk, clk_parent);
+		if(ret)
+			return ret;
+	}
 
 	uap->vendor = vendor;
 	uap->lcrh_rx = vendor->lcrh_rx;
