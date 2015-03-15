@@ -7,9 +7,6 @@
 
 /dts-v1/;
 
-/memreserve/ 0x00000000 0x07400000;
-/memreserve/ 0x0740f000 0x1000;
-
 #include "hikey-pinctrl.dtsi"
 #include "hikey-gpio.dtsi"
 #include "hi6220.dtsi"
@@ -36,9 +33,9 @@
 		linux,initrd-end = <0x0 0x0b600000>;
 	};
 
-	memory {
+	memory@0 {
 		device_type = "memory";
-		reg = <0x0 0x00000000 0x0 0x40000000>;
+		reg = <0x0 0x0 0x0 0x38c00000>;
 	};
 
 	smb {

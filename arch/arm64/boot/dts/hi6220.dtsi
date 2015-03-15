@@ -8,6 +8,11 @@
 #include <dt-bindings/thermal/thermal.h>
 
 / {
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+
 	cpus {
 		#address-cells = <2>;
 		#size-cells = <0>;
@@ -16,8 +21,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x0>;
-                        enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
+			enable-method = "psci";
 			clock-latency = <0>;
 			operating-points = <
 				/* kHz */
@@ -29,69 +33,64 @@
 			>;
 			#cooling-cells = <2>; /* min followed by max */
 		};
+
 		cpu1: cpu@1 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x1>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
+
 		cpu2: cpu@2 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x2>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
+
 		cpu3: cpu@3 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x3>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
+
 		cpu4: cpu@4 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x100>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
+			enable-method = "psci";
 			clock-latency = <0>;
 			operating-points = <
 				/* kHz */
-				208000   0
-				432000   0
-				729000   0
-				960000   0
 				1200000  0
+				960000   0
+				729000   0
+				432000   0
+				208000   0
 			>;
+			#cooling-cells = <2>; /* min followed by max */
 		};
+
 		cpu5: cpu@5 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x101>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
+
 		cpu6: cpu@6 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x102>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
+
 		cpu7: cpu@7 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x103>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
 
 		cpu-map {
@@ -216,7 +215,6 @@
 			     <1 14 0xff08>,
 			     <1 11 0xff08>,
 			     <1 10 0xff08>;
-		clock-frequency = <1200000>;
 	};
 
 	smb {
