@@ -765,7 +765,10 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	vm->hsync_len = mode->hsync_end - mode->hsync_start;
 
 	/* laneBitRate >= pixelClk*24/lanes */
-	dsi->dphy_freq = vm->pixelclock*24/dsi->lanes;
+	if (vm->vactive == 720 && vm->pixelclock == 75)
+		dsi->dphy_freq = 640; /* for 720p 640M is more stable */
+	else
+		dsi->dphy_freq = vm->pixelclock*24/dsi->lanes;
 
 	vm->flags = 0;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
@@ -853,7 +856,7 @@ static int hisi_get_default_modes(struct drm_connector *connector)
 	}
 
 	mode->vrefresh = 60;
-	mode->clock = 74175;
+	mode->clock = 75000;
 	mode->hdisplay = 1280;
 	mode->hsync_start = 1500;
 	mode->hsync_end = 1540;
