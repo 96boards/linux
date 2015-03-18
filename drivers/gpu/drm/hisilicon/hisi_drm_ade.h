@@ -13,7 +13,6 @@
 #ifndef __HISI_DRM_ADE_H__
 #define __HISI_DRM_ADE_H__
 
-extern u8 __iomem *hisi_drm_get_ade_base(void);
 extern int hisi_drm_ade_init(void);
 extern void hisi_drm_ade_exit(void);
 

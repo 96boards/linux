@@ -14,6 +14,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_gem_cma_helper.h>
 
 #include "hisi_drm_ade.h"
 #include "hisi_drm_dsi.h"
@@ -140,16 +141,42 @@ static const struct file_operations hisi_drm_fops = {
 	.poll		= drm_poll,
 	.read		= drm_read,
 	.llseek		= no_llseek,
+	.mmap		= drm_gem_cma_mmap,
 };
 
+static struct dma_buf *hisi_drm_gem_prime_export(struct drm_device *dev,
+						struct drm_gem_object *obj,
+						int flags)
+{
+	/* we want to be able to write in mmapped buffer */
+	flags |= O_RDWR;
+	return drm_gem_prime_export(dev, obj, flags);
+}
+
 static struct drm_driver hisi_drm_driver = {
-	.driver_features	= DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET
-				| DRIVER_PRIME,
+	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME,
 	.load			= hisi_drm_load,
 	.unload                 = hisi_drm_unload,
 	.fops			= &hisi_drm_fops,
 	.set_busid		= drm_platform_set_busid,
-	.name			= "hisi-drm",
+
+	.gem_free_object	= drm_gem_cma_free_object,
+	.gem_vm_ops		= &drm_gem_cma_vm_ops,
+	.dumb_create		= drm_gem_cma_dumb_create,
+	.dumb_map_offset	= drm_gem_cma_dumb_map_offset,
+	.dumb_destroy		= drm_gem_dumb_destroy,
+
+	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+	.gem_prime_export	= hisi_drm_gem_prime_export,
+	.gem_prime_import	= drm_gem_prime_import,
+	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+	.gem_prime_vmap		= drm_gem_cma_prime_vmap,
+	.gem_prime_vunmap	= drm_gem_cma_prime_vunmap,
+	.gem_prime_mmap		= drm_gem_cma_prime_mmap,
+
+	.name			= "hisi",
 	.desc			= "Hisilicon Terminal SoCs DRM Driver",
 	.date			= "20141224",
 	.major			= 1,
@@ -190,6 +217,6 @@ static struct platform_driver hisi_drm_platform_driver = {
 
 module_platform_driver(hisi_drm_platform_driver);
 
-MODULE_AUTHOR("");
+MODULE_AUTHOR("Xinliang Liu <z.liuxinliang@huawei.com>");
 MODULE_DESCRIPTION("HISI DRM Driver");
 MODULE_LICENSE("GPL");

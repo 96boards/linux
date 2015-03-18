@@ -532,23 +532,3 @@ void set_MIPIDSI_PHY_TMR_data_to_clk_delay(unsigned int nVal)
 	mipidsi_phy_clk_data_tmg_cfg.bits.data_to_clk_delay = nVal;
 	outp32(addr, mipidsi_phy_clk_data_tmg_cfg.ul32);
 }
-
-void set_dsi_mode(u32 mode)
-{
-	/* reset Core */
-	if (MIPIDSI_COMMAND_MODE == mode) {
-		/* switch to command mode */
-		set_MIPIDSI_MODE_CFG(MIPIDSI_COMMAND_MODE);
-		set_MIPIDSI_CMD_MODE_CFG_all_en_flag(1);
-		set_MIPIDSI_LPCLK_CTRL_phy_txrequestclkhs(0);
-	} else {
-		/*reset Core*/
-		set_MIPIDSI_PWR_UP_shutdownz(0);
-		/* switch to video mode */
-		set_MIPIDSI_MODE_CFG(MIPIDSI_VIDEO_MODE);
-		/* enable generate High Speed clock */
-		set_MIPIDSI_LPCLK_CTRL_phy_txrequestclkhs(1);
-		/*Waking up Core*/
-		set_MIPIDSI_PWR_UP_shutdownz(1);
-	}
-}

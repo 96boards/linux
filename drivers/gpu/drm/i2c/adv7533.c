@@ -27,22 +27,16 @@ struct adv7533 {
 
 	struct regmap *regmap_main;
 	struct regmap *regmap_dsi;
-	enum drm_connector_status status;
 	int dpms_mode;
-
-	unsigned int f_tmds;
 
 	unsigned int current_edid_segment;
 	uint8_t edid_buf[256];
 
 	wait_queue_head_t wq;
+	struct delayed_work hotplug_work;
 	struct drm_encoder *encoder;
 
-	bool embedded_sync;
-	bool rgb;
-
 	struct edid *edid;
-
 	struct gpio_desc *gpio_pd;
 
 };
@@ -70,12 +64,6 @@ static const struct regmap_config adv7533_main_regmap_config = {
 
 	.max_register = 0xff,
 	.cache_type = REGCACHE_RBTREE,
-#if 0
-	.reg_defaults_raw = adv7533_register_defaults,
-	.num_reg_defaults_raw = ARRAY_SIZE(adv7533_register_defaults),
-
-	.volatile_reg = adv7533_register_volatile,
-#endif
 };
 
 static const struct regmap_config adv7533_dsi_regmap_config = {
@@ -234,7 +222,8 @@ static void adv7533_set_config_csc(struct adv7533 *adv7533,
 		output_format_ycbcr = false;
 	}
 
-	DRM_INFO("HDMI: mode=%d,format_422=%d,format_ycbcr=%d\n", mode, output_format_422, output_format_ycbcr);
+	DRM_INFO("HDMI: mode=%d,format_422=%d,format_ycbcr=%d\n",
+			mode, output_format_422, output_format_ycbcr);
 	adv7533_packet_disable(adv7533, ADV7533_PACKET_ENABLE_AVI_INFOFRAME);
 
 	adv7533_set_colormap(adv7533, config.csc_enable,
@@ -271,23 +260,35 @@ static bool adv7533_hpd(struct adv7533 *adv7533)
 	if (ret < 0)
 		return false;
 
-	if (irq0 & ADV7533_INT0_HDP) {
-		regmap_write(adv7533->regmap_main, ADV7533_REG_INT(0),
-			     ADV7533_INT0_HDP);
+	if (irq0 & ADV7533_INT0_HDP)
 		return true;
-	}
 
 	return false;
+}
+
+static void adv7533_hotplug_work_func(struct work_struct *work)
+{
+	struct adv7533 *adv7533;
+	bool hpd_event_sent;
+
+	DRM_INFO("HDMI: hpd work in\n");
+	adv7533 = container_of(work, struct adv7533, hotplug_work.work);
+
+	if (adv7533->encoder && adv7533_hpd(adv7533)) {
+		hpd_event_sent = drm_helper_hpd_irq_event(adv7533->encoder->dev);
+		DRM_INFO("HDMI: hpd_event_sent=%d\n", hpd_event_sent);
+	}
+
+	wake_up_all(&adv7533->wq);
+	DRM_INFO("HDMI: hpd work out\n");
 }
 
 static irqreturn_t adv7533_irq_handler(int irq, void *devid)
 {
 	struct adv7533 *adv7533 = devid;
 
-	if (adv7533->encoder && adv7533_hpd(adv7533))
-		drm_helper_hpd_irq_event(adv7533->encoder->dev);
-
-	wake_up_all(&adv7533->wq);
+	mod_delayed_work(system_wq, &adv7533->hotplug_work,
+			msecs_to_jiffies(1500));
 
 	return IRQ_HANDLED;
 }
@@ -363,19 +364,24 @@ static int adv7533_get_edid_block(void *data, u8 *buf, unsigned int block,
 		if (ret < 0)
 			return ret;
 
+		DRM_INFO("HDMI: status=0x%x, ret=%d\n", status, ret);
 		if (status != 2) {
+			/* Open EDID_READY and DDC_ERROR interrupts */
+			regmap_update_bits(adv7533->regmap_main, ADV7533_REG_INT_ENABLE(0),
+				ADV7533_INT0_EDID_READY, ADV7533_INT0_EDID_READY);
+			regmap_update_bits(adv7533->regmap_main, ADV7533_REG_INT_ENABLE(1),
+				ADV7533_INT1_DDC_ERROR, ADV7533_INT1_DDC_ERROR);
 			regmap_write(adv7533->regmap_main, ADV7533_REG_EDID_SEGMENT,
 				     block);
 			ret = adv7533_wait_for_interrupt(adv7533,
 					ADV7533_INT0_EDID_READY |
-					ADV7533_INT0_HDP, 200);
+					(ADV7533_INT1_DDC_ERROR << 8), 200);
 
+			DRM_INFO("HDMI: ret=0x%x\n", ret);
 			if (!(ret & ADV7533_INT0_EDID_READY))
 				return -EIO;
 		}
 
-		regmap_write(adv7533->regmap_main, ADV7533_REG_INT(0),
-			     ADV7533_INT0_EDID_READY | ADV7533_INT0_HDP);
 
 		/* Break this apart, hopefully more I2C controllers will
 		 * support 64 byte transfers than 256 byte transfers
@@ -428,17 +434,13 @@ static int adv7533_get_modes(struct drm_encoder *encoder,
 
 	/* Reading the EDID only works if the device is powered */
 	if (adv7533->dpms_mode != DRM_MODE_DPMS_ON) {
-		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER2,
-				   BIT(6), BIT(6));
-		regmap_write(adv7533->regmap_main, ADV7533_REG_INT(0),
-			     ADV7533_INT0_EDID_READY | ADV7533_INT0_HDP);
 		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER,
 				   ADV7533_POWER_POWER_DOWN, 0);
 		adv7533->current_edid_segment = -1;
+		msleep(200); /* wait for EDID finish reading */
 	}
 
 	edid = drm_do_get_edid(connector, adv7533_get_edid_block, adv7533);
-	/* edid = drm_get_edid(connector, adv7533->i2c_edid->adapter); */
 
 	if (adv7533->dpms_mode != DRM_MODE_DPMS_ON)
 		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER,
@@ -446,9 +448,9 @@ static int adv7533_get_modes(struct drm_encoder *encoder,
 				   ADV7533_POWER_POWER_DOWN);
 
 	adv7533->edid = edid;
-	adv7533_set_config_csc(adv7533, connector, true); /*  adv7533->rgb); */
+	adv7533_set_config_csc(adv7533, connector, true);
 	if (!edid) {
-		DRM_INFO("May has one empty edid block!\n");
+		DRM_ERROR("Reading edid block error!\n");
 		return 0;
 	}
 
@@ -482,8 +484,6 @@ static void adv7533_encoder_dpms(struct drm_encoder *encoder, int mode)
 	case DRM_MODE_DPMS_ON:
 		adv7533->current_edid_segment = -1;
 
-		regmap_write(adv7533->regmap_main, ADV7533_REG_INT(0),
-			     ADV7533_INT0_EDID_READY | ADV7533_INT0_HDP);
 		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER,
 				   ADV7533_POWER_POWER_DOWN, 0);
 		/*
@@ -537,26 +537,8 @@ adv7533_encoder_detect(struct drm_encoder *encoder,
 
 	hpd = adv7533_hpd(adv7533);
 
-	/* The chip resets itself when the cable is disconnected, so in case
-	 * there is a pending HPD interrupt and the cable is connected there was
-	 * at least one transition from disconnected to connected and the chip
-	 * has to be reinitialized. */
-	if (status == connector_status_connected && hpd &&
-	    adv7533->dpms_mode == DRM_MODE_DPMS_ON) {
-		regcache_mark_dirty(adv7533->regmap_main);
-		adv7533_encoder_dpms(encoder, adv7533->dpms_mode);
-		adv7533_get_modes(encoder, connector);
-		if (adv7533->status == connector_status_connected)
-			status = connector_status_disconnected;
-	} else {
-		/* Renable HDP sensing */
-		regmap_update_bits(adv7533->regmap_main, ADV7533_REG_POWER2,
-				   BIT(6), 0);
-	}
-
-	DRM_INFO("HDMI: new_status=%d,old_status=%d,hpd=%d,dpms=%d\n",
-		status, adv7533->status, hpd, adv7533->dpms_mode);
-	adv7533->status = status;
+	DRM_INFO("HDMI: status=%d,hpd=%d,dpms=%d\n",
+		status, hpd, adv7533->dpms_mode);
 	return status;
 }
 
@@ -576,10 +558,6 @@ static void adv7533_encoder_mode_set(struct drm_encoder *encoder,
 				     struct drm_display_mode *mode,
 				     struct drm_display_mode *adj_mode)
 {
-#if 0
-	struct adv7533 *adv7533 = encoder_to_adv7533(encoder);
-	unsigned int low_refresh_rate;
-#endif
 }
 
 static struct drm_encoder_slave_funcs adv7533_encoder_funcs = {
@@ -606,7 +584,6 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		return -ENOMEM;
 
 	adv7533->dpms_mode = DRM_MODE_DPMS_OFF;
-	adv7533->status = connector_status_disconnected;
 
 	/*
 	 * The power down GPIO is optional. If present, toggle it from active to
@@ -666,6 +643,7 @@ static int adv7533_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	if (i2c->irq) {
 		init_waitqueue_head(&adv7533->wq);
 
+		INIT_DELAYED_WORK(&adv7533->hotplug_work, adv7533_hotplug_work_func);
 		ret = devm_request_threaded_irq(dev, i2c->irq, NULL,
 						adv7533_irq_handler,
 						IRQF_ONESHOT, dev_name(dev),
@@ -714,7 +692,6 @@ static int adv7533_encoder_init(struct i2c_client *i2c, struct drm_device *dev,
 
 	encoder->slave_priv = adv7533;
 	encoder->slave_funcs = &adv7533_encoder_funcs;
-
 	adv7533->encoder = &encoder->base;
 
 	return 0;

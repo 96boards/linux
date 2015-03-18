@@ -27,6 +27,7 @@
 
 
 #define SC_MEDIA_RSTDIS		(0x530)
+#define SC_MEDIA_RSTEN		(0x52C)
 
 enum {
 	LDI_TEST = 0,
@@ -91,7 +92,6 @@ enum {
 	ADE_ISR_DMA_ERROR               = 0x2000000
 };
 
-u8 __iomem *crtc_ade_base;
 
 struct hisi_drm_ade_crtc {
 
@@ -114,6 +114,7 @@ struct hisi_drm_ade_crtc {
 
 static int hisi_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 					struct drm_framebuffer *old_fb);
+static void ldi_init(struct hisi_drm_ade_crtc *crtc_ade);
 
 static void ade_init(struct hisi_drm_ade_crtc *crtc_ade)
 {
@@ -124,17 +125,17 @@ static void ade_init(struct hisi_drm_ade_crtc *crtc_ade)
 	cpu0_mask = ADE_ISR_DMA_ERROR;
 	cpu1_mask = ADE_ISR1_RES_SWITCH_CMPL;
 
-	writel(cpu0_mask, (ade_base + INTR_MASK_CPU_0_REG));
-	writel(cpu1_mask, (ade_base + INTR_MASK_CPU_1_REG));
+	writel(cpu0_mask, ade_base + INTR_MASK_CPU_0_REG);
+	writel(cpu1_mask, ade_base + INTR_MASK_CPU_1_REG);
 	set_TOP_CTL_frm_end_start(ade_base, 2);
 
 	/* disable wdma2 and wdma3 frame discard */
-	writel(0x0, (ade_base + ADE_FRM_DISGARD_CTRL_REG));
+	writel(0x0, ade_base + ADE_FRM_DISGARD_CTRL_REG);
 
-	writel(0, (ade_base + ADE_SOFT_RST_SEL0_REG));
-	writel(0, (ade_base + ADE_SOFT_RST_SEL1_REG));
-	writel(0, (ade_base + ADE_RELOAD_DIS0_REG));
-	writel(0, (ade_base + ADE_RELOAD_DIS1_REG));
+	writel(0, ade_base + ADE_SOFT_RST_SEL0_REG);
+	writel(0, ade_base + ADE_SOFT_RST_SEL1_REG);
+	writel(0, ade_base + ADE_RELOAD_DIS0_REG);
+	writel(0, ade_base + ADE_RELOAD_DIS1_REG);
 
 	/* enable clk gate */
 	set_TOP_CTL_clk_gate_en(ade_base, 1);
@@ -142,14 +143,13 @@ static void ade_init(struct hisi_drm_ade_crtc *crtc_ade)
 	/* init ovly ctrl, if not,when the first
 	* frame is hybrid, will happen 32112222
 	*/
-	writel(0, (ade_base + ADE_OVLY_CTL_REG));
+	writel(0, ade_base + ADE_OVLY_CTL_REG);
 
 	/* TODO:init scl coeff */
 }
 
-static int set_hisi_drm_ade_power_clk_enable(struct hisi_drm_ade_crtc *crtc_ade)
+static int ade_power_up(struct hisi_drm_ade_crtc *crtc_ade)
 {
-
 	u8 __iomem *media_base = crtc_ade->media_base;
 	int ret;
 
@@ -169,7 +169,7 @@ static int set_hisi_drm_ade_power_clk_enable(struct hisi_drm_ade_crtc *crtc_ade)
 		return ret;
 	}
 
-	writel(0x20, (media_base + SC_MEDIA_RSTDIS));
+	writel(0x20, media_base + SC_MEDIA_RSTDIS);
 
 	ret = clk_prepare_enable(crtc_ade->ade_core_clk);
 	if (ret) {
@@ -179,23 +179,46 @@ static int set_hisi_drm_ade_power_clk_enable(struct hisi_drm_ade_crtc *crtc_ade)
 	return 0;
 }
 
+static int ade_power_down(struct hisi_drm_ade_crtc *crtc_ade)
+{
+	u8 __iomem *media_base = crtc_ade->media_base;
+
+	clk_disable_unprepare(crtc_ade->ade_core_clk);
+	writel(0x20, media_base + SC_MEDIA_RSTEN);
+	clk_disable_unprepare(crtc_ade->media_noc_clk);
+	return 0;
+}
+
 static int hisi_drm_crtc_ade_enable(struct hisi_drm_ade_crtc *crtc_ade)
 {
 	int ret;
 
-	ret = set_hisi_drm_ade_power_clk_enable(crtc_ade);
+	ret = ade_power_up(crtc_ade);
 	if (ret) {
 		DRM_ERROR("failed to initialize ade clk\n");
 		return ret;
 	}
 
 	ade_init(crtc_ade);
-
+	ldi_init(crtc_ade);
+	if (crtc_ade->crtc.primary->fb)
+		hisi_drm_crtc_mode_set_base(&crtc_ade->crtc, 0, 0, NULL);
 	return 0;
 }
 
-static int hisi_drm_crtc_ade_unable(struct hisi_drm_ade_crtc *crtc_ade)
+static int hisi_drm_crtc_ade_disable(struct hisi_drm_ade_crtc *crtc_ade)
 {
+	int ret;
+	u8 __iomem *ade_base = crtc_ade->ade_base;
+
+	set_LDI_CTRL_ldi_en(ade_base, ADE_DISABLE);
+	/* dsi pixel off */
+	set_reg(ade_base + LDI_HDMI_DSI_GT_REG, 0x1, 1, 0);
+	ret = ade_power_down(crtc_ade);
+	if (ret) {
+		DRM_ERROR("failed to initialize ade clk\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -230,7 +253,7 @@ static void ldi_init(struct hisi_drm_ade_crtc *crtc_ade)
 	set_LDI_HRZ_CTRL1_hsw(ade_base, hsync_len);
 	set_LDI_VRT_CTRL0(ade_base, vfront_porch, vback_porch);
 	set_LDI_VRT_CTRL1_vsw(ade_base, vsync_len);
-	writel(plr_flags, (ade_base + LDI_PLR_CTRL_REG));
+	writel(plr_flags, ade_base + LDI_PLR_CTRL_REG);
 	set_LDI_DSP_SIZE_size(ade_base, mode->hdisplay, mode->vdisplay);
 	ret = clk_set_rate(crtc_ade->ade_pix_clk, mode->clock * 1000);
 	if (ret) {
@@ -244,14 +267,16 @@ static void ldi_init(struct hisi_drm_ade_crtc *crtc_ade)
 	set_LDI_WORK_MODE_work_mode(ade_base, LDI_WORK);
 	set_LDI_WORK_MODE_colorbar_en(ade_base, ADE_DISABLE);
 	ldi_mask = LDI_ISR_FRAME_END_INT | LDI_ISR_UNDER_FLOW_INT;
-	writel(ldi_mask, (ade_base + LDI_INT_EN_REG));
+	writel(ldi_mask, ade_base + LDI_INT_EN_REG);
 
 	set_LDI_CTRL_bgr(ade_base, ADE_RGB);
 	set_LDI_CTRL_bpp(ade_base, ADE_OUT_RGB_888);
 	set_LDI_CTRL_disp_mode(ade_base, LDI_DISP_MODE_NOT_3D_FBF);
 	set_LDI_CTRL_corlorbar_width(ade_base, 0x3C);
-	writel(0xFFFFFFFF, (ade_base + LDI_INT_CLR_REG));
+	writel(0xFFFFFFFF, ade_base + LDI_INT_CLR_REG);
 	set_reg(ade_base + LDI_DE_SPACE_LOW_REG, 0x1, 1, 1);
+	/* dsi pixel on */
+	set_reg(ade_base + LDI_HDMI_DSI_GT_REG, 0x0, 1, 0);
 }
 
 /* -----------------------------------------------------------------------------
@@ -271,7 +296,7 @@ static void hisi_drm_crtc_dpms(struct drm_crtc *crtc, int mode)
 	if (mode == DRM_MODE_DPMS_ON)
 		hisi_drm_crtc_ade_enable(crtc_ade);
 	else
-		hisi_drm_crtc_ade_unable(crtc_ade);
+		hisi_drm_crtc_ade_disable(crtc_ade);
 
 	crtc_ade->dpms = mode;
 	DRM_DEBUG_DRIVER("crtc_dpms exit successfully.\n");
@@ -288,7 +313,8 @@ static bool hisi_drm_crtc_mode_fixup(struct drm_crtc *crtc,
 
 static void hisi_drm_crtc_mode_prepare(struct drm_crtc *crtc)
 {
-	hisi_drm_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+	DRM_DEBUG_DRIVER(" enter successfully.\n");
+	DRM_DEBUG_DRIVER(" exit successfully.\n");
 }
 
 static int hisi_drm_crtc_mode_set(struct drm_crtc *crtc,
@@ -300,11 +326,7 @@ static int hisi_drm_crtc_mode_set(struct drm_crtc *crtc,
 	struct hisi_drm_ade_crtc *crtc_ade = to_hisi_crtc(crtc);
 
 	DRM_DEBUG_DRIVER("mode_set  enter successfully.\n");
-
 	crtc_ade->dmode = mode;
-
-	ldi_init(crtc_ade);
-
 	DRM_DEBUG_DRIVER("mode_set  exit successfully.\n");
 	return 0;
 }
@@ -313,7 +335,6 @@ static void hisi_drm_crtc_mode_commit(struct drm_crtc *crtc)
 {
 
 	DRM_DEBUG_DRIVER("mode_commit enter successfully.\n");
-	hisi_drm_crtc_mode_set_base(crtc, 0, 0, NULL);
 	DRM_DEBUG_DRIVER("mode_commit exit successfully.\n");
 }
 
@@ -323,6 +344,7 @@ static int hisi_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	struct hisi_drm_ade_crtc *crtc_ade = to_hisi_crtc(crtc);
 	struct drm_framebuffer *fb = crtc->primary->fb;
 	struct drm_gem_cma_object *obj = hisi_drm_fb_get_gem_obj(fb, 0);
+	struct hisi_drm_fb *hisi_fb = to_hisi_drm_fb(fb);
 
 	u8 __iomem *ade_base;
 	u32 stride;
@@ -334,57 +356,58 @@ static int hisi_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	stride = fb->pitches[0];
 	offset = y * fb->pitches[0] + x * (fb->bits_per_pixel >> 3);
 	display_addr = (u32)obj->paddr + offset;
-	fb_hight = fb->height / HISI_NUM_FRAMEBUFFERS;
+	fb_hight = hisi_fb->is_fbdev_fb ? fb->height / HISI_NUM_FRAMEBUFFERS
+			: fb->height;
 
 	DRM_DEBUG_DRIVER("enter stride=%d,paddr=0x%x,display_addr=0x%x,%dx%d\n",
 			stride, (u32)obj->paddr, display_addr,
 			fb->width, fb_hight);
 
 	/* TOP setting */
-	writel(0, (ade_base + ADE_WDMA2_SRC_CFG_REG));
-	writel(0, (ade_base + ADE_SCL3_MUX_CFG_REG));
-	writel(0, (ade_base + ADE_SCL1_MUX_CFG_REG));
-	writel(0, (ade_base + ADE_ROT_SRC_CFG_REG));
-	writel(0, (ade_base + ADE_SCL2_SRC_CFG_REG));
-	writel(0, (ade_base + ADE_SEC_OVLY_SRC_CFG_REG));
-	writel(0, (ade_base + ADE_WDMA3_SRC_CFG_REG));
-	writel(0, (ade_base + ADE_OVLY1_TRANS_CFG_REG));
-	writel(0, (ade_base + ADE_CTRAN5_TRANS_CFG_REG));
-	writel(0, (ade_base + ADE_OVLY_CTL_REG));
-	writel(0, (ade_base + ADE_SOFT_RST_SEL0_REG));
-	writel(0, (ade_base + ADE_SOFT_RST_SEL1_REG));
+	writel(0, ade_base + ADE_WDMA2_SRC_CFG_REG);
+	writel(0, ade_base + ADE_SCL3_MUX_CFG_REG);
+	writel(0, ade_base + ADE_SCL1_MUX_CFG_REG);
+	writel(0, ade_base + ADE_ROT_SRC_CFG_REG);
+	writel(0, ade_base + ADE_SCL2_SRC_CFG_REG);
+	writel(0, ade_base + ADE_SEC_OVLY_SRC_CFG_REG);
+	writel(0, ade_base + ADE_WDMA3_SRC_CFG_REG);
+	writel(0, ade_base + ADE_OVLY1_TRANS_CFG_REG);
+	writel(0, ade_base + ADE_CTRAN5_TRANS_CFG_REG);
+	writel(0, ade_base + ADE_OVLY_CTL_REG);
+	writel(0, ade_base + ADE_SOFT_RST_SEL0_REG);
+	writel(0, ade_base + ADE_SOFT_RST_SEL1_REG);
 	set_TOP_SOFT_RST_SEL0_disp_rdma(ade_base, 1);
 	set_TOP_SOFT_RST_SEL0_ctran5(ade_base, 1);
 	set_TOP_SOFT_RST_SEL0_ctran6(ade_base, 1);
-	writel(0, (ade_base + ADE_RELOAD_DIS0_REG));
-	writel(0, (ade_base + ADE_RELOAD_DIS1_REG));
-	writel(TOP_DISP_CH_SRC_RDMA, (ade_base + ADE_DISP_SRC_CFG_REG));
+	writel(0, ade_base + ADE_RELOAD_DIS0_REG);
+	writel(0, ade_base + ADE_RELOAD_DIS1_REG);
+	writel(TOP_DISP_CH_SRC_RDMA, ade_base + ADE_DISP_SRC_CFG_REG);
 
 	/* DISP DMA setting */
 	if (16 == fb->bits_per_pixel)
 		writel((ADE_RGB_565 << 16) & 0x1f0000,
-		    (ade_base + RD_CH_DISP_CTRL_REG));
+		    ade_base + RD_CH_DISP_CTRL_REG);
 	else if (32 == fb->bits_per_pixel)
 		writel((ADE_ABGR_8888 << 16) & 0x1f0000,
-		    (ade_base + RD_CH_DISP_CTRL_REG));
-	writel(display_addr, (ade_base + RD_CH_DISP_ADDR_REG));
-	writel(((fb_hight << 16) | stride), (ade_base + RD_CH_DISP_SIZE_REG));
-	writel(stride, (ade_base + RD_CH_DISP_STRIDE_REG));
-	writel(fb_hight * stride, (ade_base + RD_CH_DISP_SPACE_REG));
-	writel(1, (ade_base + RD_CH_DISP_EN_REG));
+		    ade_base + RD_CH_DISP_CTRL_REG);
+	writel(display_addr, ade_base + RD_CH_DISP_ADDR_REG);
+	writel((fb_hight << 16) | stride, ade_base + RD_CH_DISP_SIZE_REG);
+	writel(stride, ade_base + RD_CH_DISP_STRIDE_REG);
+	writel(fb_hight * stride, ade_base + RD_CH_DISP_SPACE_REG);
+	writel(1, ade_base + RD_CH_DISP_EN_REG);
 
 	/* ctran5 setting */
-	writel(1, (ade_base + ADE_CTRAN5_DIS_REG));
+	writel(1, ade_base + ADE_CTRAN5_DIS_REG);
 	writel(fb->width * fb_hight - 1,
-		(ade_base + ADE_CTRAN5_IMAGE_SIZE_REG));
+		ade_base + ADE_CTRAN5_IMAGE_SIZE_REG);
 
 	/* ctran6 setting */
-	writel(1, (ade_base + ADE_CTRAN6_DIS_REG));
+	writel(1, ade_base + ADE_CTRAN6_DIS_REG);
 	writel(fb->width * fb_hight - 1,
-		(ade_base + ADE_CTRAN6_IMAGE_SIZE_REG));
+		ade_base + ADE_CTRAN6_IMAGE_SIZE_REG);
 
 	/* enable ade and ldi */
-	writel(ADE_ENABLE, (ade_base + ADE_EN_REG));
+	writel(ADE_ENABLE, ade_base + ADE_EN_REG);
 	set_TOP_CTL_frm_end_start(ade_base, 1);
 	set_LDI_CTRL_ldi_en(ade_base, ADE_ENABLE);
 
@@ -446,11 +469,6 @@ static int hisi_drm_crtc_create(struct hisi_drm_ade_crtc *crtc_ade)
 	return 0;
 }
 
-u8 __iomem *hisi_drm_get_ade_base(void)
-{
-	return crtc_ade_base;
-}
-
 static int hisi_drm_ade_dts_parse(struct platform_device *pdev,
 				    struct hisi_drm_ade_crtc *crtc_ade)
 {
@@ -475,8 +493,6 @@ static int hisi_drm_ade_dts_parse(struct platform_device *pdev,
 		DRM_ERROR("failed to remap io region1\n");
 		ret = PTR_ERR(crtc_ade->media_base);
 	}
-
-	crtc_ade_base = crtc_ade->ade_base;
 
 	crtc_ade->ade_core_clk = devm_clk_get(&pdev->dev, "clk_ade_core");
 	if (crtc_ade->ade_core_clk == NULL) {

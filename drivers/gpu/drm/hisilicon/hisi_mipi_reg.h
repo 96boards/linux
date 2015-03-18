@@ -724,7 +724,6 @@ extern void set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clklp2hs_time(u32 nVal);
 extern void set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clkhs2lp_time(u32 nVal);
 extern void set_MIPIDSI_PHY_TMR_clk_to_data_delay(u32 nVal);
 extern void set_MIPIDSI_PHY_TMR_data_to_clk_delay(u32 nVal);
-extern void set_dsi_mode(u32 mode);
 extern void set_MIPIDSI_DPI_CFG_LP_TIM(u32 nVal);
 extern void set_MIPIDSI_VID_MODE_CFG_lp_cmd_en(u32 nVal);
 extern void set_MIPIDSI_PHY_TMR_CFG_max_rd_time(u32 nVal);

@@ -30,11 +30,6 @@
 #include "hisi_mipi_reg.h"
 #include "hisi_drm_dsi.h"
 
-/* DSI Relevant Registers */
-#define LDI_HDMI_DSI_GT_REG         (0x7434)
-#define DSI_CMD_MOD_CTRL_REG        (0x743C)
-#define set_LDI_DSI_CMD_MOD_CTRL(nVal) \
-	{writel(nVal, hisi_drm_get_ade_base() + DSI_CMD_MOD_CTRL_REG); }
 
 #define connector_to_dsi(connector) \
 	container_of(connector, struct hisi_dsi, connector)
@@ -50,28 +45,6 @@
 
 u8 *reg_base_mipi_dsi;
 
-
-struct hisi_dsi {
-	struct drm_connector connector;
-	struct drm_encoder_slave base;
-	struct device *dev;
-	struct i2c_client *client;
-	struct drm_i2c_encoder_driver *drm_i2c_driver;
-	struct clk *dsi_cfg_clk;
-	struct videomode vm;
-
-	u8 __iomem *reg_base;
-	u8 color_mode;
-
-	u32 lanes;
-	u32 format;
-	u32 dphy_freq;
-	u32 date_enable_pol;
-	u32 vc;
-	u32 mode_flags;
-
-	int dpms;
-};
 
 struct mipi_dsi_phy_register {
 	u32 clk_t_lpx;
@@ -107,6 +80,27 @@ struct mipi_dsi_phy_register {
 	u32 lane_byte_clk;
 	u32 clk_division;
 	u32 burst_mode;
+};
+
+struct hisi_dsi {
+	struct drm_encoder_slave base;
+	struct drm_connector connector;
+	struct i2c_client *client;
+	struct drm_i2c_encoder_driver *drm_i2c_driver;
+	struct clk *dsi_cfg_clk;
+	struct videomode vm;
+
+	u8 __iomem *reg_base;
+	u8 color_mode;
+
+	u32 lanes;
+	u32 format;
+	struct mipi_dsi_phy_register phy_register;
+	u32 date_enable_pol;
+	u32 vc;
+	u32 mode_flags;
+
+	int dpms;
 };
 
 enum {
@@ -337,16 +331,14 @@ int mipi_init(struct hisi_dsi *dsi)
 	u32 i = 0;
 	bool is_ready = false;
 	u32 delay_count = 0;
-	struct mipi_dsi_phy_register phy_register = {0};
+	struct mipi_dsi_phy_register *phy_register = &dsi->phy_register;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	get_dsi_phy_register(&dsi->dphy_freq, &phy_register);
-	set_MIPIDSI_PHY_IF_CFG_n_lanes(dsi->lanes-1);
-	set_MIPIDSI_CLKMGR_CFG_tx_esc_clk_division(phy_register.clk_division);
+	/* reset Core */
+	set_MIPIDSI_PWR_UP_shutdownz(0);
 
-	/*Video screen, enable Halt signal only*/
-	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
-		set_LDI_DSI_CMD_MOD_CTRL(0x2);
+	set_MIPIDSI_PHY_IF_CFG_n_lanes(dsi->lanes-1);
+	set_MIPIDSI_CLKMGR_CFG_tx_esc_clk_division(phy_register->clk_division);
 
 	set_MIPIDSI_PHY_RSTZ(0x00000000);
 	set_MIPIDSI_PHY_TST_CTRL0(0x00000000);
@@ -357,7 +349,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10010);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.clk_t_lpx);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->clk_t_lpx);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -365,7 +357,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10011);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.clk_t_hs_prepare);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->clk_t_hs_prepare);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -373,7 +365,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10012);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.clk_t_hs_zero);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->clk_t_hs_zero);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -381,7 +373,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10013);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.clk_t_hs_trial);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->clk_t_hs_trial);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -389,7 +381,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10014);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.clk_t_wakeup);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->clk_t_wakeup);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -399,7 +391,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10020 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_lpx);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_lpx);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -407,7 +399,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10021 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_hs_prepare);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_hs_prepare);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -415,7 +407,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10022 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_hs_zero);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_hs_zero);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -423,7 +415,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10023 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_hs_trial);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_hs_trial);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -431,7 +423,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10024 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_ta_go);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_ta_go);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -439,7 +431,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10025 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_ta_get);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_ta_get);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -447,7 +439,7 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_PHY_TST_CTRL1(0x10026 + (i << 4));
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
-		set_MIPIDSI_PHY_TST_CTRL1(phy_register.data_t_wakeup);
+		set_MIPIDSI_PHY_TST_CTRL1(phy_register->data_t_wakeup);
 		set_MIPIDSI_PHY_TST_CTRL0(0x2);
 		set_MIPIDSI_PHY_TST_CTRL0(0x0);
 	}
@@ -456,7 +448,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10060);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.rg_hstx_ckg_sel);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->rg_hstx_ckg_sel);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -464,9 +456,9 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10063);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1((phy_register.rg_pll_fbd_div5f << 5) +
-		(phy_register.rg_pll_fbd_div1f << 4) + (phy_register.rg_pll_fbd_2p << 1) +
-		phy_register.rg_pll_enbwt);
+	set_MIPIDSI_PHY_TST_CTRL1((phy_register->rg_pll_fbd_div5f << 5) +
+		(phy_register->rg_pll_fbd_div1f << 4) + (phy_register->rg_pll_fbd_2p << 1) +
+		phy_register->rg_pll_enbwt);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -474,7 +466,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10064);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1(phy_register.rg_pll_fbd_p);
+	set_MIPIDSI_PHY_TST_CTRL1(phy_register->rg_pll_fbd_p);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -482,7 +474,7 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10065);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1((1 << 4) + phy_register.rg_pll_fbd_s);
+	set_MIPIDSI_PHY_TST_CTRL1((1 << 4) + phy_register->rg_pll_fbd_s);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -490,8 +482,8 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10066);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1((phy_register.rg_pll_pre_div1p << 7) +
-		phy_register.rg_pll_pre_p);
+	set_MIPIDSI_PHY_TST_CTRL1((phy_register->rg_pll_pre_div1p << 7) +
+		phy_register->rg_pll_pre_p);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -499,8 +491,8 @@ int mipi_init(struct hisi_dsi *dsi)
 	set_MIPIDSI_PHY_TST_CTRL1(0x10067);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
-	set_MIPIDSI_PHY_TST_CTRL1((5 << 5) + (phy_register.rg_pll_vco_750M << 4) +
-		(phy_register.rg_pll_lpf_rs << 2) + phy_register.rg_pll_lpf_cs);
+	set_MIPIDSI_PHY_TST_CTRL1((5 << 5) + (phy_register->rg_pll_vco_750M << 4) +
+		(phy_register->rg_pll_lpf_rs << 2) + phy_register->rg_pll_lpf_cs);
 	set_MIPIDSI_PHY_TST_CTRL0(0x2);
 	set_MIPIDSI_PHY_TST_CTRL0(0x0);
 
@@ -574,17 +566,17 @@ int mipi_init(struct hisi_dsi *dsi)
 	*/
 
 	pixel_clk = dsi->vm.pixelclock;
-	hsa_time = dsi->vm.hsync_len * phy_register.lane_byte_clk / pixel_clk;
-	hbp_time = dsi->vm.hback_porch * phy_register.lane_byte_clk / pixel_clk;
+	hsa_time = dsi->vm.hsync_len * phy_register->lane_byte_clk / pixel_clk;
+	hbp_time = dsi->vm.hback_porch * phy_register->lane_byte_clk / pixel_clk;
 	hline_time  = (dsi->vm.hsync_len + dsi->vm.hback_porch +
 		dsi->vm.hactive + dsi->vm.hfront_porch) *
-		phy_register.lane_byte_clk / pixel_clk;
+		phy_register->lane_byte_clk / pixel_clk;
 	set_MIPIDSI_VID_HSA_TIME(hsa_time);
 	set_MIPIDSI_VID_HBP_TIME(hbp_time);
 	set_MIPIDSI_VID_HLINE_TIME(hline_time);
 
-	DRM_INFO("%s,pixcel_clk=%d,dphy_freq=%d,hsa=%d,hbp=%d,hline=%d", __func__,
-			pixel_clk, dsi->dphy_freq, hsa_time, hbp_time, hline_time);
+	DRM_INFO("%s,pixcel_clk=%d,lane_byte_clk=%d,hsa=%d,hbp=%d,hline=%d", __func__,
+			pixel_clk, phy_register->lane_byte_clk, hsa_time, hbp_time, hline_time);
 	/*
 	 * 5. Define the Vertical line configuration:
 	 *
@@ -615,19 +607,19 @@ int mipi_init(struct hisi_dsi *dsi)
 
 	/* Configure core's phy parameters */
 	set_MIPIDSI_BTA_TO_CNT_bta_to_cnt(4095);
-	set_MIPIDSI_PHY_TMR_CFG_phy_lp2hs_time(phy_register.phy_lp2hs_time);
-	set_MIPIDSI_PHY_TMR_CFG_phy_hs2lp_time(phy_register.phy_hs2lp_time);
-	set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clklp2hs_time(phy_register.phy_clklp2hs_time);
-	set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clkhs2lp_time(phy_register.phy_clkhs2lp_time);
-	set_MIPIDSI_PHY_TMR_clk_to_data_delay(phy_register.clk_to_data_delay);
-	set_MIPIDSI_PHY_TMR_data_to_clk_delay(phy_register.data_to_clk_delay);
+	set_MIPIDSI_PHY_TMR_CFG_phy_lp2hs_time(phy_register->phy_lp2hs_time);
+	set_MIPIDSI_PHY_TMR_CFG_phy_hs2lp_time(phy_register->phy_hs2lp_time);
+	set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clklp2hs_time(phy_register->phy_clklp2hs_time);
+	set_MIPIDSI_PHY_TMR_LPCLK_CFG_phy_clkhs2lp_time(phy_register->phy_clkhs2lp_time);
+	set_MIPIDSI_PHY_TMR_clk_to_data_delay(phy_register->clk_to_data_delay);
+	set_MIPIDSI_PHY_TMR_data_to_clk_delay(phy_register->data_to_clk_delay);
 	/*
 	 * 3. Select the Video Transmission Mode:
 	 * This defines how the processor requires the video line to be
 	 * transported through the DSI link.
 	*/
 	set_MIPIDSI_VID_MODE_CFG_frame_bta_ack_en(0);
-	set_MIPIDSI_VID_MODE_CFG_vid_mode_type(phy_register.burst_mode);
+	set_MIPIDSI_VID_MODE_CFG_vid_mode_type(phy_register->burst_mode);
 	set_MIPIDSI_LPCLK_CTRL_auto_clklane_ctrl(0);
 	/* for dsi read */
 	set_MIPIDSI_PCKHDL_CFG_bta_en(1);
@@ -636,6 +628,10 @@ int mipi_init(struct hisi_dsi *dsi)
 		set_MIPIDSI_EDPI_CMD_SIZE(dsi->vm.hactive);
 
 	/*------------DSI and D-PHY Initialization-----------------*/
+	/* switch to video mode */
+        set_MIPIDSI_MODE_CFG(MIPIDSI_VIDEO_MODE);
+	/* enable generate High Speed clock */
+	set_MIPIDSI_LPCLK_CTRL_phy_txrequestclkhs(1);
 	/* Waking up Core */
 	set_MIPIDSI_PWR_UP_shutdownz(1);
 	DRM_INFO("%s , exit success!\n", __func__);
@@ -643,43 +639,38 @@ int mipi_init(struct hisi_dsi *dsi)
 	return 0;
 }
 
-static int hisi_dsi_init(struct hisi_dsi *dsi)
-{
-	int ret = 0;
-
-	DRM_DEBUG_DRIVER("enter.\n");
-	/* mipi dphy clock enable */
-	ret = clk_prepare_enable(dsi->dsi_cfg_clk);
-	if (ret != 0) {
-		dev_err(dsi->dev, "failed to enable dsi_cfg_clk, error=%d!\n", ret);
-		return ret;
-	}
-	/* dsi pixel on */
-	set_reg(hisi_drm_get_ade_base() + LDI_HDMI_DSI_GT_REG, 0x0, 1, 0);
-	DRM_DEBUG_DRIVER("exit success.\n");
-	return mipi_init(dsi);
-}
-
-static int hisi_dsi_enable(struct hisi_dsi *dsi)
+static void hisi_dsi_enable(struct hisi_dsi *dsi)
 {
 	int ret;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	ret = hisi_dsi_init(dsi);
-	if (ret)
-		DRM_ERROR("failed to init dsi\n");
+	/* mipi dphy clock enable */
+	ret = clk_prepare_enable(dsi->dsi_cfg_clk);
+	if (ret) {
+		DRM_ERROR("failed to enable dsi_cfg_clk, error=%d!\n", ret);
+		return;
+	}
 
-	set_dsi_mode(MIPIDSI_VIDEO_MODE);
-	set_MIPIDSI_GEN_HDR(NULL, 0x137);
+	ret = mipi_init(dsi);
+	if (ret) {
+		DRM_ERROR("failed to init mipi, error=%d!\n", ret);
+		return;
+	}
 	DRM_DEBUG_DRIVER("exit success.\n");
-	return 0;
 }
 
-static int hisi_dsi_disable(struct hisi_dsi *dsi)
+static void hisi_dsi_disable(struct hisi_dsi *dsi)
 {
 	DRM_DEBUG_DRIVER("enter.\n");
+	/*reset Core*/
+	set_MIPIDSI_PWR_UP_shutdownz(0);
+	/* disable generate High Speed clock */
+	set_MIPIDSI_LPCLK_CTRL_phy_txrequestclkhs(0);
+	/* shutdown d_phy */
+	set_MIPIDSI_PHY_RSTZ(0);
+	/* mipi dphy clock disable */
+	clk_disable_unprepare(dsi->dsi_cfg_clk);
 	DRM_DEBUG_DRIVER("exit success.\n");
-	return 0;
 }
 
 static void hisi_drm_encoder_destroy(struct drm_encoder *encoder)
@@ -689,7 +680,7 @@ static void hisi_drm_encoder_destroy(struct drm_encoder *encoder)
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	/*release*/
-	if (sfuncs && sfuncs->destroy)
+	if (sfuncs->destroy)
 		sfuncs->destroy(encoder);
 	drm_encoder_cleanup(encoder);
 	kfree(dsi);
@@ -714,16 +705,12 @@ static void hisi_drm_encoder_dpms(struct drm_encoder *encoder, int mode)
 	case DRM_MODE_DPMS_ON:
 		hisi_dsi_enable(dsi);
 		break;
-	case DRM_MODE_DPMS_STANDBY:
-	case DRM_MODE_DPMS_SUSPEND:
-	case DRM_MODE_DPMS_OFF:
-		hisi_dsi_disable(dsi);
-		break;
 	default:
+		hisi_dsi_disable(dsi);
 		break;
 	}
 
-	if (sfuncs && sfuncs->dpms)
+	if (sfuncs->dpms)
 		sfuncs->dpms(encoder, mode);
 	DRM_DEBUG_DRIVER("exit success.\n");
 }
@@ -737,7 +724,7 @@ hisi_drm_encoder_mode_fixup(struct drm_encoder *encoder,
 	bool ret = true;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	if (sfuncs && sfuncs->mode_fixup)
+	if (sfuncs->mode_fixup)
 		ret =  sfuncs->mode_fixup(encoder, mode, adjusted_mode);
 
 	DRM_DEBUG_DRIVER("exit success.ret=%d\n", ret);
@@ -752,6 +739,8 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	struct hisi_dsi *dsi = encoder_to_dsi(encoder);
 	struct videomode *vm = &dsi->vm;
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
+	u32 dphy_freq_need;
+	u32 dphy_freq_true;
 
 	DRM_DEBUG_DRIVER("enter.\n");
 	vm->pixelclock = mode->clock/1000;
@@ -766,9 +755,10 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 
 	/* laneBitRate >= pixelClk*24/lanes */
 	if (vm->vactive == 720 && vm->pixelclock == 75)
-		dsi->dphy_freq = 640; /* for 720p 640M is more stable */
+		dphy_freq_true = dphy_freq_need = 640; /* for 720p 640M is more stable */
 	else
-		dsi->dphy_freq = vm->pixelclock*24/dsi->lanes;
+		dphy_freq_true = dphy_freq_need = vm->pixelclock*24/dsi->lanes;
+	get_dsi_phy_register(&dphy_freq_true, &dsi->phy_register);
 
 	vm->flags = 0;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
@@ -780,21 +770,21 @@ static void hisi_drm_encoder_mode_set(struct drm_encoder *encoder,
 	else if (mode->flags & DRM_MODE_FLAG_NVSYNC)
 		vm->flags |= DISPLAY_FLAGS_VSYNC_LOW;
 
-	if (sfuncs && sfuncs->mode_set)
+	if (sfuncs->mode_set)
 		sfuncs->mode_set(encoder, mode, adjusted_mode);
-	DRM_DEBUG_DRIVER("exit success: pixelclk=%d,dphy_freq=%d\n",
-			(u32)vm->pixelclock, dsi->dphy_freq);
+	DRM_DEBUG_DRIVER("exit success: pixelclk=%d,dphy_freq_need=%d, dphy_freq_true=%d\n",
+			(u32)vm->pixelclock, dphy_freq_need, dphy_freq_true);
 }
 
 static void hisi_drm_encoder_prepare(struct drm_encoder *encoder)
 {
-	/*do nothing at all*/
+	DRM_DEBUG_DRIVER("enter.\n");
+	DRM_DEBUG_DRIVER("exit success.\n");
 }
 
 static void hisi_drm_encoder_commit(struct drm_encoder *encoder)
 {
 	DRM_DEBUG_DRIVER("enter.\n");
-	hisi_drm_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
 	DRM_DEBUG_DRIVER("exit success.\n");
 }
 
@@ -823,7 +813,7 @@ hisi_dsi_detect(struct drm_connector *connector, bool force)
 	enum drm_connector_status status = connector_status_unknown;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	if (sfuncs && sfuncs->detect)
+	if (sfuncs->detect)
 		status = sfuncs->detect(encoder, connector);
 
 	DRM_DEBUG_DRIVER("exit success. status=%d\n", status);
@@ -867,6 +857,7 @@ static int hisi_get_default_modes(struct drm_connector *connector)
 	mode->vtotal = 750;
 	mode->type = 0x40;
 	mode->flags = 0xa;
+	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
 
 	DRM_DEBUG_DRIVER("exit successfully.\n");
@@ -882,11 +873,11 @@ static int hisi_dsi_get_modes(struct drm_connector *connector)
 	int count = 0;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	if (sfuncs && sfuncs->get_modes)
-		count = sfuncs->get_modes(encoder, connector);
-
 #if USE_DEFAULT_720P_MODE
-	count += hisi_get_default_modes(connector);
+	count = hisi_get_default_modes(connector);
+#else
+	if (sfuncs->get_modes)
+		count = sfuncs->get_modes(encoder, connector);
 #endif
 	DRM_DEBUG_DRIVER("exit success. count=%d\n", count);
 	return count;
@@ -911,13 +902,12 @@ static int hisi_drm_connector_mode_valid(struct drm_connector *connector,
 	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
 	int ret = MODE_OK;
 
-#if USE_DEFAULT_720P_MODE
-	if (mode->vdisplay != 720)
-		return MODE_ONE_SIZE;
-#endif
+	/* For 3 lanes bandwith is limited */
+	if (mode->vdisplay > 1000)
+		return MODE_BAD_VVALUE;
 
 	DRM_DEBUG_DRIVER("enter.\n");
-	if (sfuncs && sfuncs->mode_valid)
+	if (sfuncs->mode_valid)
 		ret = sfuncs->mode_valid(encoder, mode);
 
 	DRM_DEBUG_DRIVER("exit success. ret=%d\n", ret);
@@ -939,7 +929,7 @@ static int hisi_drm_encoder_create(struct drm_device *dev, struct hisi_dsi *dsi)
 	DRM_DEBUG_DRIVER("enter.\n");
 	dsi->dpms = DRM_MODE_DPMS_OFF;
 	encoder->possible_crtcs = 1;
-	drm_encoder_init(dev, encoder, &hisi_encoder_funcs, DRM_MODE_ENCODER_DSI);
+	drm_encoder_init(dev, encoder, &hisi_encoder_funcs, DRM_MODE_ENCODER_TMDS);
 	drm_encoder_helper_add(encoder, &hisi_encoder_helper_funcs);
 
 	ret = dsi->drm_i2c_driver->encoder_init(dsi->client, dev, &dsi->base);
@@ -964,12 +954,17 @@ void hisi_drm_connector_create(struct drm_device *dev, struct hisi_dsi *dsi)
 	struct drm_connector *connector = &dsi->connector;
 
 	DRM_DEBUG_DRIVER("enter.\n");
+	connector->polled = DRM_CONNECTOR_POLL_HPD;
+	connector->dpms = DRM_MODE_DPMS_OFF;
 	ret = drm_connector_init(encoder->dev, connector,
 					&hisi_dsi_connector_funcs,
-					DRM_MODE_CONNECTOR_DSI);
+					DRM_MODE_CONNECTOR_HDMIA);
 	drm_connector_helper_add(connector, &hisi_dsi_connector_helper_funcs);
 	drm_connector_register(connector);
 	drm_mode_connector_attach_encoder(connector, encoder);
+#ifndef CONFIG_DRM_HISI_FBDEV
+	drm_reinit_primary_mode_group(dev);
+#endif
 	DRM_DEBUG_DRIVER("exit success.\n");
 }
 

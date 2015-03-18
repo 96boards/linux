@@ -13,9 +13,10 @@
 #include <drm/drmP.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_crtc_helper.h>
+
 #include "hisi_drm_fb.h"
 
-static inline struct hisi_drm_fb *to_hisi_drm_fb(struct drm_framebuffer *fb)
+struct hisi_drm_fb *to_hisi_drm_fb(struct drm_framebuffer *fb)
 {
 	return container_of(fb, struct hisi_drm_fb, fb);
 }
@@ -44,14 +45,24 @@ static int hisi_drm_fb_create_handle(struct drm_framebuffer *fb,
 			&hisi_fb->obj[0]->base, handle);
 }
 
+static int hisi_drm_fb_dirty(struct drm_framebuffer *fb,
+				struct drm_file *file_priv, unsigned flags,
+				unsigned color, struct drm_clip_rect *clips,
+				unsigned num_clips)
+{
+	/* TODO */
+	return 0;
+}
+
 static struct drm_framebuffer_funcs hisi_drm_fb_funcs = {
 	.destroy	= hisi_drm_fb_destroy,
 	.create_handle	= hisi_drm_fb_create_handle,
+	.dirty		= hisi_drm_fb_dirty,
 };
 
 struct hisi_drm_fb *hisi_drm_fb_alloc(struct drm_device *dev,
 	struct drm_mode_fb_cmd2 *mode_cmd, struct drm_gem_cma_object **obj,
-	unsigned int num_planes)
+	unsigned int num_planes, bool is_fbdev_fb)
 {
 	struct hisi_drm_fb *hisi_fb;
 	int ret;
@@ -61,6 +72,7 @@ struct hisi_drm_fb *hisi_drm_fb_alloc(struct drm_device *dev,
 	if (!hisi_fb)
 		return ERR_PTR(-ENOMEM);
 
+	hisi_fb->is_fbdev_fb = is_fbdev_fb;
 	drm_helper_mode_fill_fb_struct(&hisi_fb->fb, mode_cmd);
 
 	for (i = 0; i < num_planes; i++)
@@ -124,7 +136,7 @@ static struct drm_framebuffer *hisi_drm_fb_create(struct drm_device *dev,
 		objs[i] = to_drm_gem_cma_obj(obj);
 	}
 
-	hisi_fb = hisi_drm_fb_alloc(dev, mode_cmd, objs, i);
+	hisi_fb = hisi_drm_fb_alloc(dev, mode_cmd, objs, i, false);
 	if (IS_ERR(hisi_fb)) {
 		ret = PTR_ERR(hisi_fb);
 		goto err_gem_object_unreference;

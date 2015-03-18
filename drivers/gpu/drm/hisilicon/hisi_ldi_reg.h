@@ -30,6 +30,7 @@
 #define LDI_MCU_INTS_REG		(0x7450)
 #define LDI_MCU_INTE_REG		(0x7454)
 #define LDI_MCU_INTC_REG		(0x7458)
+#define LDI_HDMI_DSI_GT_REG		(0x7434)
 
 
 /* LDI Timing Polarity defines */

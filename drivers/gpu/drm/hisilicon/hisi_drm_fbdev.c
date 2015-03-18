@@ -250,7 +250,7 @@ static int hisi_drm_fbdev_probe(struct drm_fb_helper *helper,
 		goto err_drm_gem_cma_free_object;
 	}
 
-	fbdev->fb = hisi_drm_fb_alloc(dev, &mode_cmd, &obj, 1);
+	fbdev->fb = hisi_drm_fb_alloc(dev, &mode_cmd, &obj, 1, true);
 	if (IS_ERR(fbdev->fb)) {
 		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
 		ret = PTR_ERR(fbdev->fb);
@@ -409,6 +409,8 @@ void hisi_drm_fbdev_exit(struct drm_device *dev)
 {
 	struct hisi_drm_private *private = dev->dev_private;
 
-
-	hisi_drm_fbdev_fini(private->fbdev);
+	if (private->fbdev) {
+		hisi_drm_fbdev_fini(private->fbdev);
+		private->fbdev = NULL;
+	}
 }
