@@ -273,3 +273,32 @@ void __init hi6220_clk_register_divider(struct hi6220_divider_clock *clks,
 		data->clk_data.clks[clks[i].id] = clk;
 	}
 }
+
+void __init hisi_clk_register_stub(struct hisi_stub_clock *clks, int nums,
+				   struct hisi_clock_data *data,
+				   struct device_node *np)
+{
+	struct clk *clk;
+	int i;
+
+	for (i = 0; i < nums; i++) {
+		clk = hisi_register_stub_clk(np,
+					     clks[i].id,
+					     clks[i].name,
+					     clks[i].parent_name,
+					     clks[i].flags,
+					     &hisi_clk_lock);
+		if (IS_ERR(clk)) {
+			pr_err("%s: failed to register clock %s\n",
+			       __func__, clks[i].name);
+			continue;
+		}
+
+		if (clks[i].alias)
+			clk_register_clkdev(clk, clks[i].name, NULL);
+
+		data->clk_data.clks[clks[i].id] = clk;
+	}
+
+	return;
+}

@@ -102,6 +102,14 @@ struct hisi_gate_clock {
 	const char		*alias;
 };
 
+struct hisi_stub_clock {
+	unsigned int		id;
+	char			*name;
+	const char		*parent_name;
+	unsigned long		flags;
+	const char		*alias;
+};
+
 struct clk *hisi_register_clkgate_sep(struct device *, const char *,
 				const char *, unsigned long,
 				void __iomem *, u8,
@@ -130,5 +138,8 @@ void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
 					int, struct hisi_clock_data *);
 void __init hi6220_clk_register_divider(struct hi6220_divider_clock *,
 					int, struct hisi_clock_data *);
+void __init hisi_clk_register_stub(struct hisi_stub_clock *clks, int nums,
+				   struct hisi_clock_data *data,
+				   struct device_node *np);
 
 #endif	/* __HISI_CLK_H */
