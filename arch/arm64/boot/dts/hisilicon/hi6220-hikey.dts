@@ -7,13 +7,13 @@
 
 /dts-v1/;
 
-/memreserve/ 0x0740f000 0x1000;
+/memreserve/ 0x05E00000 0x00100000;
 
 #include "hi6220.dtsi"
 
 / {
 	model = "HiKey Development Board";
-	compatible = "hisilicon,hi6220-hikey";
+	compatible = "hisilicon,hikey", "hisilicon,hi6220";
 	#address-cells = <2>;
 	#size-cells = <2>;
 	interrupt-parent = <&gic>;
@@ -24,8 +24,8 @@
 
 	chosen { };
 
-	memory@7400000 {
+	memory@0 {
 		device_type = "memory";
-		reg = <0x0 0x07400000 0x0 0x38c00000>;
+		reg = <0x0 0x0 0x0 0x38c00000>;
 	};
 };
