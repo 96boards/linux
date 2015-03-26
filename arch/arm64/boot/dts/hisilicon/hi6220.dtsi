@@ -7,104 +7,111 @@
 #include <dt-bindings/clock/hi6220-clock.h>
 
 / {
-	cpu-map {
-		cluster0 {
-			core0 {
-				cpu = <&cpu0>;
-			};
-			core1 {
-				cpu = <&cpu1>;
-			};
-			core2 {
-				cpu = <&cpu2>;
-			};
-			core3 {
-				cpu = <&cpu3>;
-			};
-		};
-		cluster1 {
-			core0 {
-				cpu = <&cpu4>;
-			};
-			core1 {
-				cpu = <&cpu5>;
-			};
-			core2 {
-				cpu = <&cpu6>;
-			};
-			core3 {
-				cpu = <&cpu7>;
-			};
-		};
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
 	};
 
 	cpus {
 		#address-cells = <2>;
 		#size-cells = <0>;
 
-		cpu0: cpu@000 {
+		cpu0: cpu@0 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x0>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
+			enable-method = "psci";
+			clocks = <&clock_stub HISI_STUB_ACPU0>;
 			clock-latency = <0>;
+			operating-points = <
+				/* kHz */
+				1200000  0
+				960000   0
+				729000   0
+				432000   0
+				208000   0
+			>;
+			#cooling-cells = <2>; /* min followed by max */
 		};
-		cpu1: cpu@001 {
+
+		cpu1: cpu@1 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x1>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu2: cpu@002 {
+
+		cpu2: cpu@2 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x2>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu3: cpu@003 {
+
+		cpu3: cpu@3 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x3>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu4: cpu@100 {
+
+		cpu4: cpu@4 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x100>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu5: cpu@101 {
+
+		cpu5: cpu@5 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x101>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu6: cpu@102 {
+
+		cpu6: cpu@6 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x102>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
 		};
-		cpu7: cpu@103 {
+
+		cpu7: cpu@7 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x103>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+		};
+
+		cpu-map {
+			cluster0 {
+				core0 {
+					cpu = <&cpu0>;
+				};
+				core1 {
+					cpu = <&cpu1>;
+				};
+				core2 {
+					cpu = <&cpu2>;
+				};
+				core3 {
+					cpu = <&cpu3>;
+				};
+			};
+			cluster1 {
+				core0 {
+					cpu = <&cpu4>;
+				};
+				core1 {
+					cpu = <&cpu5>;
+				};
+				core2 {
+					cpu = <&cpu6>;
+				};
+				core3 {
+					cpu = <&cpu7>;
+				};
+			};
 		};
 	};
 
@@ -136,6 +143,16 @@
 		#size-cells = <2>;
 		interrupt-parent = <&gic>;
 		ranges;
+
+		sram: sram {
+			compatible = "hisilicon,sram", "syscon";
+			reg = <0x0 0xFFF80000 0x0 0x12000>;
+		};
+
+		ipc_s: ipc_s {
+			compatible = "hisilicon,ipc-s", "syscon";
+			reg = <0x0 0xF7510000 0x0 0x1000>;
+		};
 
 		ao_ctrl: ao_ctrl {
 			compatible = "hisilicon,aoctrl", "syscon";
@@ -191,6 +208,13 @@
 				reg = <0 0x1000>;
 				#clock-cells = <1>;
 			};
+		};
+
+		clock_stub: clock_stub {
+			compatible = "hisilicon,hisi-clock-stub";
+			hisilicon,clk-stub-sram = <&sram>;
+			hisilicon,clk-stub-mc = <&ipc_s>;
+			#clock-cells = <1>;
 		};
 
 		uart0: uart@f8015000 {	/* console */

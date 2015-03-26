@@ -169,4 +169,7 @@
 #define HI6220_DDRC_AXI1	11
 
 #define HI6220_POWER_NR_CLKS	16
+
+#include <dt-bindings/clock/hisi,stub-clock.h>
+
 #endif
