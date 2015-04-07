@@ -1068,6 +1068,19 @@ static void armv8pmu_disable_event(struct hw_perf_event *hwc, int idx)
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 }
 
+static irqreturn_t armv8pmu_handle_irq_none(int irq_num, void *dev)
+{
+        int next;
+        if (num_online_cpus() > 1) {
+                next = cpumask_next(smp_processor_id(), cpu_online_mask);
+                if (next > nr_cpu_ids)
+                        next = cpumask_next(-1, cpu_online_mask);
+                irq_set_affinity(irq_num, cpumask_of(next));
+        }
+
+        return IRQ_NONE;
+}
+
 static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
 {
 	u32 pmovsr;
@@ -1085,7 +1098,7 @@ static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
 	 * Did an overflow occur?
 	 */
 	if (!armv8pmu_has_overflowed(pmovsr))
-		return IRQ_NONE;
+		return armv8pmu_handle_irq_none(irq_num, dev);
 
 	/*
 	 * Handle the counter(s) overflow(s)
