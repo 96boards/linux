@@ -2642,13 +2642,20 @@ int dw_mci_probe(struct dw_mci *host)
 		host->bus_hz = host->pdata->bus_hz;
 	} else {
 		if (host->pdata->bus_hz) {
-			ret = clk_set_rate(host->biu_clk, host->pdata->bus_hz);
+			ret = clk_set_rate(host->ciu_clk, host->pdata->bus_hz);
 			if (ret)
 				dev_warn(host->dev,
 					 "Unable to set bus rate to %uHz\n",
 					 host->pdata->bus_hz);
 		}
-		host->bus_hz = clk_get_rate(host->biu_clk);
+
+		ret = clk_prepare_enable(host->ciu_clk);
+		if (ret) {
+			dev_err(host->dev, "failed to enable ciu clock\n");
+			goto err_clk_biu;
+		}
+
+		host->bus_hz = clk_get_rate(host->ciu_clk);
 	}
 
 	if (!host->bus_hz) {
@@ -2818,6 +2825,7 @@ err_clk_ciu:
 	if (!IS_ERR(host->ciu_clk))
 		clk_disable_unprepare(host->ciu_clk);
 
+err_clk_biu:
 	if (!IS_ERR(host->biu_clk))
 		clk_disable_unprepare(host->biu_clk);
 
