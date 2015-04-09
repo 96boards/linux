@@ -41,6 +41,7 @@
 
 #define SC_PERIPH_CTRL8			0x018
 
+#define SC_PERIPH_RSTEN0		0x300
 #define SC_PERIPH_RSTDIS0		0x304
 
 #define PERIPH_RSTDIS0_MMC0		BIT(0)
@@ -106,14 +107,17 @@ static int hisi_phy_setup(struct hisi_priv *priv, enum usb_mode mode)
 		val = PERIPH_RSTDIS0_USBOTG_BUS | PERIPH_RSTDIS0_POR_PICOPHY |
 			PERIPH_RSTDIS0_USBOTG | PERIPH_RSTDIS0_USBOTG_32K;
 		mask = val;
-		ret = regmap_update_bits(priv->reg, 0x300, mask, val);
+		ret = regmap_update_bits(priv->reg, SC_PERIPH_RSTEN0, mask, val);
 		if (ret)
 			goto out;
 	} else {
-
 		val = PERIPH_RSTDIS0_USBOTG_BUS | PERIPH_RSTDIS0_POR_PICOPHY |
 			PERIPH_RSTDIS0_USBOTG | PERIPH_RSTDIS0_USBOTG_32K;
 		mask = val;
+		ret = regmap_update_bits(priv->reg, SC_PERIPH_RSTEN0, mask, val);
+		if (ret)
+			goto out;
+
 		ret = regmap_update_bits(priv->reg, SC_PERIPH_RSTDIS0, mask, val);
 		if (ret)
 			goto out;
