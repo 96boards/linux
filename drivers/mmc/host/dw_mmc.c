@@ -2655,9 +2655,9 @@ int dw_mci_probe(struct dw_mci *host)
 			goto err_clk_biu;
 		}
 
-		host->bus_hz = clk_get_rate(host->ciu_clk);
 	}
 
+	host->bus_hz = clk_get_rate(host->biu_clk);
 	if (!host->bus_hz) {
 		dev_err(host->dev,
 			"Platform data must supply bus speed\n");
