@@ -78,7 +78,6 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
 			pr_err("failed to map Hisilicon clock registers\n");
 			return NULL;
 		}
-		printk("%s: base %p\n", __func__, base);
 	} else {
 		pr_err("failed to find Hisilicon clock node in DTS\n");
 		return NULL;
@@ -300,8 +299,8 @@ void __init hisi_clk_register_stub(struct hisi_stub_clock *clks, int nums,
 			goto err;
 		}
 
-		pr_info("%s: set_freq_func_id=%x, get_freq_func_id=%x\n",
-			__func__, set_freq_func_id, get_freq_func_id);
+		pr_debug("%s: set_freq_func_id=%x, get_freq_func_id=%x\n",
+			 __func__, set_freq_func_id, get_freq_func_id);
 	} else {
 		base      = of_iomap(np, 0);
 		comm_base = of_iomap(np, 1);
@@ -311,8 +310,8 @@ void __init hisi_clk_register_stub(struct hisi_stub_clock *clks, int nums,
 			goto err;
 		}
 
-		pr_info("%s: base=0x%p, comm_base=0x%p\n", __func__,
-			base, comm_base);
+		pr_debug("%s: base=0x%p, comm_base=0x%p\n", __func__,
+			 base, comm_base);
 	}
 
 	for (i = 0; i < nums; i++) {
