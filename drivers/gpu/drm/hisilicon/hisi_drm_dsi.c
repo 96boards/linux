@@ -867,9 +867,10 @@ static int hisi_get_default_modes(struct drm_connector *connector)
 
 static int hisi_dsi_get_modes(struct drm_connector *connector)
 {
-	struct hisi_dsi *dsi = connector_to_dsi(connector);
-	struct drm_encoder *encoder = &dsi->base.base;
-	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
+	struct hisi_dsi *dsi __maybe_unused = connector_to_dsi(connector);
+	struct drm_encoder *encoder __maybe_unused = &dsi->base.base;
+	struct drm_encoder_slave_funcs *sfuncs __maybe_unused =
+		get_slave_funcs(encoder);
 	int count = 0;
 
 	DRM_DEBUG_DRIVER("enter.\n");
@@ -1012,14 +1013,14 @@ static int hisi_dsi_probe(struct platform_device *pdev)
 	dsi->client = of_find_i2c_device_by_node(slave_node);
 	of_node_put(slave_node);
 	if (!dsi->client) {
-		DRM_ERROR("failed to find slave encoder i2c client\n");
+		DRM_INFO("failed to find slave encoder i2c client\n");
 		return -EPROBE_DEFER;
 	}
 
 	dsi->drm_i2c_driver = to_drm_i2c_encoder_driver(
 		to_i2c_driver(dsi->client->dev.driver));
 	if (!dsi->drm_i2c_driver) {
-		DRM_ERROR("failed initialize encoder driver\n");
+		DRM_INFO("failed initialize encoder driver\n");
 		return -EPROBE_DEFER;
 	}
 
