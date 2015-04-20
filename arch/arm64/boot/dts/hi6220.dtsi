@@ -1106,35 +1106,6 @@
 		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
 		clock-names = "thermal_clk";
 		#thermal-sensor-cells = <1>;
-
-		local_sensor {
-			hisilicon,tsensor-id = <0>;
-			hisilicon,tsensor-lag-value = <10>;
-			hisilicon,tsensor-thres-temp = <80000>;
-			hisilicon,tsensor-reset-temp = <100000>;
-			hisilicon,tsensor-bind-irq;
-		};
-
-		acpu1_sensor {
-			hisilicon,tsensor-id = <1>;
-			hisilicon,tsensor-lag-value = <10>;
-			hisilicon,tsensor-thres-temp = <80000>;
-			hisilicon,tsensor-reset-temp = <100000>;
-		};
-
-		acpu0_sensor {
-			hisilicon,tsensor-id = <2>;
-			hisilicon,tsensor-lag-value = <10>;
-			hisilicon,tsensor-thres-temp = <80000>;
-			hisilicon,tsensor-reset-temp = <100000>;
-		};
-
-		gpu_sensor {
-			hisilicon,tsensor-id = <3>;
-			hisilicon,tsensor-lag-value = <10>;
-			hisilicon,tsensor-thres-temp = <80000>;
-			hisilicon,tsensor-reset-temp = <100000>;
-		};
 	};
 
 	thermal-zones {
