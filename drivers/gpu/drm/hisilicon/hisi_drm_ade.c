@@ -295,7 +295,7 @@ static void hisi_drm_crtc_dpms(struct drm_crtc *crtc, int mode)
 
 	if (mode == DRM_MODE_DPMS_ON)
 		hisi_drm_crtc_ade_enable(crtc_ade);
-	else
+	else if (mode == DRM_MODE_DPMS_OFF)
 		hisi_drm_crtc_ade_disable(crtc_ade);
 
 	crtc_ade->dpms = mode;

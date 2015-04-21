@@ -705,8 +705,10 @@ static void hisi_drm_encoder_dpms(struct drm_encoder *encoder, int mode)
 	case DRM_MODE_DPMS_ON:
 		hisi_dsi_enable(dsi);
 		break;
-	default:
+	case DRM_MODE_DPMS_OFF:
 		hisi_dsi_disable(dsi);
+		break;
+	default:
 		break;
 	}
 
