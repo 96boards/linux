@@ -9,6 +9,11 @@
 #include <dt-bindings/pinctrl/hisi.h>
 
 / {
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+
 	cpus {
 		#address-cells = <2>;
 		#size-cells = <0>;
@@ -17,8 +22,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x0>;
-                        enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
+			enable-method = "psci";
 			clocks = <&clock_acpu HI6220_STUB_ACPU0>;
 			clock-names = "acpu0";
 			clock-latency = <0>;
@@ -31,62 +35,85 @@
 				208000   0
 			>;
 			#cooling-cells = <2>; /* min followed by max */
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu1: cpu@1 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x1>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu2: cpu@2 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x2>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu3: cpu@3 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x3>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu4: cpu@4 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x100>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
+			enable-method = "psci";
 			clock-latency = <0>;
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu5: cpu@5 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x101>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu6: cpu@6 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x102>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
 		};
+
 		cpu7: cpu@7 {
 			compatible = "arm,cortex-a53", "arm,armv8";
 			device_type = "cpu";
 			reg = <0x0 0x103>;
-			enable-method = "spin-table";
-                        cpu-release-addr = <0x0 0x740fff8>;
-			clock-latency = <0>;
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
+		};
+
+		idle-states {
+			entry-method = "arm,psci";
+
+			CPU_SLEEP_0_0: cpu-sleep-0-0 {
+				compatible = "arm,idle-state";
+				arm,psci-suspend-param = <0x0010000>;
+				entry-latency-us = <250>;
+				exit-latency-us = <500>;
+				min-residency-us = <950>;
+			};
+
+			CLUSTER_SLEEP_0: cluster-sleep-0 {
+				compatible = "arm,idle-state";
+				arm,psci-suspend-param = <0x1010000>;
+				entry-latency-us = <600>;
+				exit-latency-us = <1100>;
+				min-residency-us = <2700>;
+				wakeup-latency-us = <1500>;
+			};
 		};
 
 		cpu-map {
@@ -211,7 +238,6 @@
 			     <1 14 0xff08>,
 			     <1 11 0xff08>,
 			     <1 10 0xff08>;
-		clock-frequency = <1200000>;
 	};
 
 	smb {
