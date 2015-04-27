@@ -93,6 +93,9 @@
 #define HI6220_MEDIA_PLL_SRC	31
 #define HI6220_MMC2_SEL		32
 #define HI6220_CS_ATB_SYSPLL	33
+#define HI6220_MMC0_DIS_CLK	34
+#define HI6220_MMC1_DIS_CLK	35
+#define HI6220_MMC2_DIS_CLK	36
 
 /* mux clocks */
 #define HI6220_MMC0_SRC		35
