@@ -1116,10 +1116,16 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
 	struct dw_mci *host = slot->host;
+	const struct dw_mci_drv_data *drv_data = host->drv_data;
 	u32 uhs;
 	u32 v18 = SDMMC_UHS_18V << slot->id;
 	int min_uv, max_uv;
 	int ret;
+
+	if (drv_data && drv_data->switch_voltage) {
+		ret = drv_data->switch_voltage(mmc, ios);
+		return ret;
+	}
 
 	/*
 	 * Program the voltage.  Note that some instances of dw_mmc may use
