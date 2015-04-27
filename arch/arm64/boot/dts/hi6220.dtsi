@@ -155,8 +155,6 @@
 		reg = <0x0 0xf7800000 0x0 0x2000>;
 		ranges = <0 0x0 0xf7800000 0x2000>;
 
-		reboot-offset = <0x10>;
-
 		clock_ao: clock0@0 {
 			compatible = "hisilicon,hi6220-clock-ao";
 			reg = <0 0x1000>;
@@ -214,6 +212,13 @@
 			     <1 11 0xff08>,
 			     <1 10 0xff08>;
 		clock-frequency = <1200000>;
+	};
+
+	reboot {
+		compatible = "syscon-reboot";
+		regmap = <&ao_ctrl>;
+		offset = <0x10>;
+		mask = <0x48698284>;
 	};
 
 	smb {
