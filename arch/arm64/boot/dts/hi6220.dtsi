@@ -149,13 +149,11 @@
 	};
 
 	ao_ctrl: ao_ctrl {
-		compatible = "hisilicon,aoctrl";
+		compatible = "hisilicon,aoctrl", "syscon";
 		#address-cells = <1>;
 		#size-cells = <1>;
 		reg = <0x0 0xf7800000 0x0 0x2000>;
 		ranges = <0 0x0 0xf7800000 0x2000>;
-
-		reboot-offset = <0x10>;
 
 		clock_ao: clock0@0 {
 			compatible = "hisilicon,hi6220-clock-ao";
@@ -214,6 +212,13 @@
 			     <1 11 0xff08>,
 			     <1 10 0xff08>;
 		clock-frequency = <1200000>;
+	};
+
+	reboot {
+		compatible = "syscon-reboot";
+		regmap = <&ao_ctrl>;
+		offset = <0x10>;
+		mask = <0x48698284>;
 	};
 
 	smb {
@@ -980,7 +985,7 @@
 	};
 
         dwmmc_0: dwmmc0@f723d000 {
-                compatible = "hisilicon,hisi-dw-mshc";
+                compatible = "hisilicon,hi6220-dw-mshc";
                 num-slots = <0x1>;
                 board-mmc-bus-clk = <0x0>;
                 broken-cd;
@@ -989,14 +994,14 @@
                 clocks = <&clock_sys HI6220_MMC0_CIUCLK>, <&clock_sys HI6220_MMC0_CLK>;
                 clock-names = "ciu", "biu";
 		vmmc-supply = <&ldo19>;
-		hisilicon,disable-boot;
         };
 
 	dwmmc_1: dwmmc1@f723e000 {
-		compatible = "hisilicon,hisi-dw-mshc";
+		compatible = "hisilicon,hi6220-dw-mshc";
 		num-slots = <0x1>;
 		board-mmc-bus-clk = <0x0>;
 		card-detect-delay = <200>;
+		hisilicon,peripheral-syscon = <&ao_ctrl>;
 		reg = <0x0 0xf723e000 0x0 0x1000>;
 		interrupts = <0x0 0x49 0x4>;
 		#address-cells = <0x1>;
@@ -1008,7 +1013,7 @@
 	};
 
 	dwmmc_2: dwmmc2@f723f000 {
-		compatible = "hisilicon,hisi-dw-mshc";
+		compatible = "hisilicon,hi6220-dw-mshc";
 		num-slots = <0x1>;
 		board-mmc-bus-clk = <0x0>;
 		reg = <0x0 0xf723f000 0x0 0x1000>;
