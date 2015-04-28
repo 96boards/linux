@@ -12,11 +12,13 @@
 
 #define reset_offset 0x334
 #define pclk_offset 0x230
+#define SOC_HI6220_ACPU_SCTRL_BASE_ADDR 0xF6504000
+#define armv8_pmu_offset 0x0EC
 #define PMUSSI_REG_EX(pmu_base, reg_addr) (((reg_addr) << 2) + (char *)pmu_base)
 
 static int __init hi6220_sysconf(void)
 {
-        static void __iomem *base = NULL, *base1 = NULL;
+        static void __iomem *base = NULL, *base1 = NULL, *base2 = NULL;
         struct device_node *node, *node1;
 	unsigned char ret;
 
@@ -26,7 +28,7 @@ static int __init hi6220_sysconf(void)
 
         base = of_iomap(node, 0);
         if (base == NULL) {
-                printk(KERN_ERR "hi6220: sysctrl reg iomap failed!\n");
+                pr_err(KERN_ERR "hi6220: sysctrl reg iomap failed!\n");
                 return -ENOMEM;
         }
 
@@ -36,9 +38,15 @@ static int __init hi6220_sysconf(void)
 
         base1 = of_iomap(node1, 0);
         if (base1 == NULL) {
-                printk(KERN_ERR "hi6220: pmic reg iomap failed!\n");
+                pr_err(KERN_ERR "hi6220: pmic reg iomap failed!\n");
                 return -ENOMEM;
         }
+
+	base2 = ioremap(SOC_HI6220_ACPU_SCTRL_BASE_ADDR, SZ_4K);
+	if (base2 == NULL) {
+		pr_err("hi6220: asctl reg iomap failed!\n");
+		return -ENOMEM;
+	}
 
         /*Disable UART1 reset and set pclk*/
         writel(BIT(5), base + reset_offset);
@@ -64,8 +72,12 @@ static int __init hi6220_sysconf(void)
 	ret |= 0x40;
 	*(volatile unsigned char*)PMUSSI_REG_EX(base1, 0x1c) = ret;
 
+	/*enable armv8-pmu*/
+	writel(0xff, base2 + armv8_pmu_offset);
+
         iounmap(base);
         iounmap(base1);
+        iounmap(base2);
 
         return 0;
 }

@@ -216,6 +216,11 @@
 		clock-frequency = <1200000>;
 	};
 
+	pmu {
+		compatible = "arm,armv8-pmuv3";
+		interrupts = <0 99 4>;
+	};
+
 	smb {
 		compatible = "simple-bus";
 		#address-cells = <2>;
