@@ -114,11 +114,14 @@ static const char *uart4_src[] __initconst = { "clk_tcxo", "clk_150m", };
 static const char *hifi_src[] __initconst = { "syspll", "pll_media_gate", };
 
 static struct hisi_gate_clock hi6220_separated_gate_clks_sys[] __initdata = {
-	{ HI6220_MMC0_CLK,      "mmc0_clk",      "mmc0_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
+	{ HI6220_MMC0_RST_CLK, "mmc0_rst_clk", "mmc0_src", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x304, 0,  0, },
+	{ HI6220_MMC0_CLK,      "mmc0_clk",      "mmc0_rst_clk",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
 	{ HI6220_MMC0_CIUCLK,   "mmc0_ciuclk",   "mmc0_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
-	{ HI6220_MMC1_CLK,      "mmc1_clk",      "mmc1_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 1,  0, },
+	{ HI6220_MMC1_RST_CLK,	"mmc1_rst_clk",	"mmc1_src",	CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x304, 1,  0, },
+	{ HI6220_MMC1_CLK,      "mmc1_clk",      "mmc1_rst_clk",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 1,  0, },
 	{ HI6220_MMC1_CIUCLK,   "mmc1_ciuclk",   "mmc1_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 1,  0, },
-	{ HI6220_MMC2_CLK,      "mmc2_clk",      "mmc2_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 2,  0, },
+	{ HI6220_MMC2_RST_CLK, "mmc2_rst_clk", "mmc2_src", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x304, 2,  0, },
+	{ HI6220_MMC2_CLK,      "mmc2_clk",      "mmc2_rst_clk",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 2,  0, },
 	{ HI6220_MMC2_CIUCLK,   "mmc2_ciuclk",   "mmc2_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 2,  0, },
 	{ HI6220_USBOTG_HCLK,   "usbotg_hclk",   "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 4,  0, },
 	{ HI6220_CLK_PICOPHY,   "clk_picophy",   "cs_dapb",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 5,  0, },
