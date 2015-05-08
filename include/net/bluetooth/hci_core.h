@@ -330,6 +330,11 @@ struct hci_dev {
 
 	struct rfkill		*rfkill;
 
+#ifdef CONFIG_BLUETOOTH_LEDS
+	struct led_trigger	*tx_led, *rx_led;
+	char			tx_led_name[32], rx_led_name[32];
+#endif
+
 	unsigned long		dbg_flags;
 	unsigned long		dev_flags;
 

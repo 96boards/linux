@@ -162,6 +162,7 @@
 		bt_active_led {
 			label = "bt_active";
 			gpios = <&gpio4 7 0>; /* <&gpio_bt_active_led>; */
+			linux,default-trigger = "hci0tx";
 			default-state = "off";
 		};
 

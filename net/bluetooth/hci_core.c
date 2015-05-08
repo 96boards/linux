@@ -37,6 +37,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/mgmt.h>
 
+#include "led.h"
 #include "smp.h"
 
 static void hci_rx_work(struct work_struct *work);
@@ -4123,6 +4124,9 @@ int hci_register_dev(struct hci_dev *hdev)
 	if (hdev->rfkill && rfkill_blocked(hdev->rfkill))
 		set_bit(HCI_RFKILLED, &hdev->dev_flags);
 
+	bluetooth_led_names(hdev);
+	bluetooth_led_init(hdev);
+
 	set_bit(HCI_SETUP, &hdev->dev_flags);
 	set_bit(HCI_AUTO_OFF, &hdev->dev_flags);
 
@@ -4196,6 +4200,8 @@ void hci_unregister_dev(struct hci_dev *hdev)
 
 	hci_notify(hdev, HCI_DEV_UNREG);
 
+	bluetooth_led_exit(hdev);
+
 	if (hdev->rfkill) {
 		rfkill_unregister(hdev->rfkill);
 		rfkill_destroy(hdev->rfkill);
@@ -4261,6 +4267,8 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
 
 	skb_queue_tail(&hdev->rx_q, skb);
 	queue_work(hdev->workqueue, &hdev->rx_work);
+
+	bluetooth_led_rx(hdev);
 
 	return 0;
 }
@@ -4460,6 +4468,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 		BT_ERR("%s sending frame failed (%d)", hdev->name, err);
 		kfree_skb(skb);
 	}
+
+	bluetooth_led_tx(hdev);
 }
 
 void hci_req_init(struct hci_request *req, struct hci_dev *hdev)
