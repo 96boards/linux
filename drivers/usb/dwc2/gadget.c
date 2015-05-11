@@ -38,6 +38,7 @@
 #include <linux/uaccess.h>
 
 #include "core.h"
+#include "hcd.h"
 #include "hw.h"
 
 /* conversion functions */
@@ -3709,8 +3710,12 @@ static int config_fops_set(void *data, u64 speed)
 {
 	struct dwc2_hsotg *hsotg = data;
 
-	if (hsotg->core_params->speed != speed)
+	if (hsotg->core_params->speed != speed) {
 		hsotg->core_params->speed = speed;
+
+		if (dwc2_is_host_mode(hsotg))
+			queue_work(hsotg->wq_otg, &hsotg->wf_otg);
+	}
 
 	if (hsotg->core_params->speed)
 		pr_info("Current speed=%d: FULL speed\n",
