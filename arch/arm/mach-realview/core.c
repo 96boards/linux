@@ -34,6 +34,8 @@
 #include <linux/mtd/physmap.h>
 #include <linux/memblock.h>
 
+#include <clocksource/timer-sp804.h>
+
 #include <mach/hardware.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
@@ -43,10 +45,8 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
 
-
 #include <mach/platform.h>
 #include <mach/irqs.h>
-#include <asm/hardware/timer-sp.h>
 
 #include <plat/sched_clock.h>
 
