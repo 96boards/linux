@@ -371,6 +371,16 @@
 				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
 			};
 
+			wl_en_func: wl_en_func {
+				pinctrl-single,pins = <
+					0x024  0x0	/* GPIO0_5	(IOCFG009) */
+					0x04c  0x0	/* GPIO1_7	(IOCFG019) */
+				>;
+				pinctrl-single,bias-pulldown  = <PULL_DIS  PULL_DOWN PULL_DIS  PULL_DOWN>;
+				pinctrl-single,bias-pullup    = <PULL_DIS  PULL_UP   PULL_DIS  PULL_UP>;
+				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
+			};
+
 			isp_cfg_func1: isp_cfg_func1 {
 				pinctrl-single,pins = <
 					0x28   0x0	/* ISP_PWDN0    (IOCFG010) */

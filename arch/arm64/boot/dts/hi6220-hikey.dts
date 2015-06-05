@@ -96,8 +96,8 @@
 		/* WL_EN */
 		vmmc-supply = <&wlan_en_reg>;
 		pinctrl-names = "default", "idle";
-		pinctrl-0 = <&sdio_pmx_func &sdio_clk_cfg_func &sdio_cfg_func>;
-		pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle>;
+		pinctrl-0 = <&sdio_pmx_func &sdio_clk_cfg_func &sdio_cfg_func &wl_en_func>;
+		pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle &wl_en_func>;
 	};
 
 	wlcore {
