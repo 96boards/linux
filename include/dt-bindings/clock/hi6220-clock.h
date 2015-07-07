@@ -176,6 +176,12 @@
 
 #define HI6220_POWER_NR_CLKS	16
 
-#include <dt-bindings/clock/hisi,stub-clock.h>
+/* Stub Clocks */
+#define HI6220_STUB_ACPU0	0
+#define HI6220_STUB_ACPU1	1
+#define HI6220_STUB_GPU		2
+#define HI6220_STUB_DDR		5
+
+#define HI6220_STUB_NR_CLKS	6
 
 #endif
