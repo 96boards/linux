@@ -60,4 +60,12 @@ config OMAP_MBOX_KFIFO_SIZE
 	  Specify the default size of mailbox's kfifo buffers (bytes).
 	  This can also be changed at runtime (via the mbox_kfifo_size
 	  module parameter).
+
+config HI6220_MBOX
+	tristate "Hi6220 Mailbox"
+	help
+          An implementation of the hi6220 mailbox. It is used to send message
+	  between application processors and MCU. Say Y here if you want to build
+	  the Hi6220 mailbox controller driver.
+
 endif
