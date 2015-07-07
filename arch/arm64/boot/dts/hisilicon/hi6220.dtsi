@@ -21,7 +21,7 @@
 			device_type = "cpu";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
-			clocks = <&clock_stub HISI_STUB_ACPU0>;
+			clocks = <&clock_stub HI6220_STUB_ACPU0>;
 			clock-latency = <0>;
 			operating-points = <
 				/* kHz */
@@ -149,11 +149,6 @@
 			reg = <0x0 0xFFF80000 0x0 0x12000>;
 		};
 
-		ipc_s: ipc_s {
-			compatible = "hisilicon,ipc-s", "syscon";
-			reg = <0x0 0xF7510000 0x0 0x1000>;
-		};
-
 		ao_ctrl: ao_ctrl {
 			compatible = "hisilicon,aoctrl", "syscon";
 			#address-cells = <1>;
@@ -211,10 +206,10 @@
 		};
 
 		clock_stub: clock_stub {
-			compatible = "hisilicon,hisi-clock-stub";
+			compatible = "hisilicon,hi6220-stub-clk";
 			hisilicon,clk-stub-sram = <&sram>;
-			hisilicon,clk-stub-mc = <&ipc_s>;
 			#clock-cells = <1>;
+			mboxes = <&mailbox 1>;
 		};
 
 		uart0: uart@f8015000 {	/* console */
@@ -224,5 +219,15 @@
 			clocks = <&clock_ao HI6220_UART0_PCLK>, <&clock_ao HI6220_UART0_PCLK>;
 			clock-names = "uartclk", "apb_pclk";
 		};
+
+		mailbox: mailbox {
+			#mbox-cells = <1>;
+			compatible = "hisilicon,hi6220-mbox";
+			reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
+			      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
+			interrupt-parent = <&gic>;
+			interrupts = <0 94 4>;
+		};
+
 	};
 };
