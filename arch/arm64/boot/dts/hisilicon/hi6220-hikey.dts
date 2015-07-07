@@ -28,4 +28,20 @@
 		device_type = "memory";
 		reg = <0x0 0x07400000 0x0 0x38c00000>;
 	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		mcu-buf@0740f000 {
+			no-map;
+			reg = <0x0 0x0740f000 0x0 0x00001000>;
+		};
+
+		mailbox-buf@06dff000 {
+			no-map;
+			reg = <0x0 0x06dff000 0x0 0x00001000>;
+		};
+	};
 };
