@@ -4,7 +4,9 @@
  * Copyright (C) 2015, Hisilicon Ltd.
  */
 
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/hi6220-clock.h>
+#include <dt-bindings/thermal/thermal.h>
 
 / {
 	psci {
@@ -21,7 +23,7 @@
 			device_type = "cpu";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
-			clocks = <&clock_stub HISI_STUB_ACPU0>;
+			clocks = <&stub_clock 0>;
 			clock-latency = <0>;
 			operating-points = <
 				/* kHz */
@@ -144,9 +146,9 @@
 		interrupt-parent = <&gic>;
 		ranges;
 
-		sram: sram {
-			compatible = "hisilicon,sram", "syscon";
-			reg = <0x0 0xFFF80000 0x0 0x12000>;
+		sram: sram@fff80000 {
+			compatible = "hisilicon,hi6220-sramctrl", "syscon";
+			reg = <0x0 0xfff80000 0x0 0x12000>;
 		};
 
 		ipc_s: ipc_s {
@@ -210,11 +212,11 @@
 			};
 		};
 
-		clock_stub: clock_stub {
-			compatible = "hisilicon,hisi-clock-stub";
-			hisilicon,clk-stub-sram = <&sram>;
-			hisilicon,clk-stub-mc = <&ipc_s>;
+		stub_clock: stub_clock {
+			compatible = "hisilicon,hi6220-stub-clk";
+			hisilicon,hi6220-clk-sram = <&sram>;
 			#clock-cells = <1>;
+			mboxes = <&mailbox 1>;
 		};
 
 		uart0: uart@f8015000 {	/* console */
