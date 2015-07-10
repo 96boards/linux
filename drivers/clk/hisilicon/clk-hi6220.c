@@ -287,22 +287,3 @@ static void __init hi6220_clk_power_init(struct device_node *np)
 				ARRAY_SIZE(hi6220_div_clks_power), clk_data);
 }
 CLK_OF_DECLARE(hi6220_clk_power, "hisilicon,hi6220-clock-power", hi6220_clk_power_init);
-
-static struct hisi_stub_clock hi6220_stub_clks[] __initdata = {
-	{ HISI_STUB_ACPU0, "acpu0", NULL, CLK_IS_ROOT | CLK_GET_RATE_NOCACHE, },
-};
-
-static void __init hi6220_clk_stub_init(struct device_node *np)
-{
-	struct hisi_clock_data *clk_data;
-
-	clk_data = hisi_clk_alloc_data(np, HISI_STUB_NR_CLKS);
-	if (!clk_data)
-		return;
-
-	hisi_clk_register_stub(hi6220_stub_clks,
-			ARRAY_SIZE(hi6220_stub_clks), clk_data, np);
-	return;
-
-}
-CLK_OF_DECLARE(hi6220_clk_stub, "hisilicon,hisi-clock-stub", hi6220_clk_stub_init);

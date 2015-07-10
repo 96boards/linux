@@ -72,15 +72,9 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
 	struct hisi_clock_data *clk_data;
 	void __iomem *base;
 
-	if (np) {
-		base = of_iomap(np, 0);
-		if (!base) {
-			pr_err("failed to map Hisilicon clock registers\n");
-			return NULL;
-		}
-		printk("%s: base %p\n", __func__, base);
-	} else {
-		pr_err("failed to find Hisilicon clock node in DTS\n");
+	base = of_iomap(np, 0);
+	if (!base) {
+		pr_err("%s: failed to map clock registers\n", __func__);
 		return NULL;
 	}
 
@@ -272,33 +266,4 @@ void __init hi6220_clk_register_divider(struct hi6220_divider_clock *clks,
 
 		data->clk_data.clks[clks[i].id] = clk;
 	}
-}
-
-void __init hisi_clk_register_stub(struct hisi_stub_clock *clks, int nums,
-				   struct hisi_clock_data *data,
-				   struct device_node *np)
-{
-	struct clk *clk;
-	int i;
-
-	for (i = 0; i < nums; i++) {
-		clk = hisi_register_stub_clk(np,
-					     clks[i].id,
-					     clks[i].name,
-					     clks[i].parent_name,
-					     clks[i].flags,
-					     &hisi_clk_lock);
-		if (IS_ERR(clk)) {
-			pr_err("%s: failed to register clock %s\n",
-			       __func__, clks[i].name);
-			continue;
-		}
-
-		if (clks[i].alias)
-			clk_register_clkdev(clk, clks[i].name, NULL);
-
-		data->clk_data.clks[clks[i].id] = clk;
-	}
-
-	return;
 }

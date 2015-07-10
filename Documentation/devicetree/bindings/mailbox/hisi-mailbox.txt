@@ -1,0 +1,35 @@
+Hisilicon Mailbox Driver
+========================
+
+Hisilicon mailbox can support maximum 32 channels. Every channel supports
+only one direction for data transferring, the maximum message data size is 8
+bytes. For sending data, need set the register for channel's mode, and
+trigger the interrupt for remote core. For receiving data, kernel will
+handle interrupt and transfer data to mailbox framework.
+
+Mailbox Device Node:
+====================
+
+Required properties:
+--------------------
+- compatible:		Shall be "hisilicon,hi6220-mbox"
+- reg:			Contains the mailbox register address range (base
+			address and length); the first item is for IPC
+			registers, the second item is shared buffer for
+			slots.
+- #mbox-cells		Shall be 1 - the index of the channel needed.
+- interrupts:		Contains the interrupt information for the mailbox
+			device. The format is dependent on which interrupt
+			controller the SoCs use.
+
+Example:
+--------
+
+	mailbox: mailbox@F7510000 {
+		#mbox-cells = <1>;
+		compatible = "hisilicon,hi6220-mbox";
+		reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
+		      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
+		interrupt-parent = <&gic>;
+		interrupts = <0 94 4>;
+	};
