@@ -8,3 +8,5 @@ obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= scpi_protocol.o
 obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
 
 obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+
+obj-$(CONFIG_HI6220_MBOX)	+= hisi-mailbox.o
