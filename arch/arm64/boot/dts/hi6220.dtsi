@@ -307,6 +307,15 @@
 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		dual_timer0: dual_timer@f8008000 {
+			compatible = "arm,sp804", "arm,primecell";
+			reg = <0x0 0xf8008000 0x0 0x1000>;
+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clock_ao 31>, <&clock_ao 31>;
+			clock-names = "apb_pclk", "apb_pclk";
+		};
+
 		pmx0: pinmux@f7010000 {
 			compatible = "pinctrl-single";
 			reg = <0x0 0xf7010000  0x0 0x27c>;
