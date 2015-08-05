@@ -4,6 +4,7 @@
  * Copyright (C) 2014, Hisilicon Ltd.
  */
 
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/hi6220-clock.h>
 #include <dt-bindings/thermal/thermal.h>
 #include <dt-bindings/pinctrl/hisi.h>
@@ -23,7 +24,7 @@
 			device_type = "cpu";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
-			clocks = <&clock_acpu HI6220_STUB_ACPU0>;
+			clocks = <&stub_clock 0>;
 			clock-names = "acpu0";
 			clock-latency = <0>;
 			operating-points = <
@@ -100,6 +101,7 @@
 
 			CPU_SLEEP_0_0: cpu-sleep-0-0 {
 				compatible = "arm,idle-state";
+				local-timer-stop;
 				arm,psci-suspend-param = <0x0010000>;
 				entry-latency-us = <250>;
 				exit-latency-us = <500>;
@@ -108,6 +110,7 @@
 
 			CLUSTER_SLEEP_0: cluster-sleep-0 {
 				compatible = "arm,idle-state";
+				local-timer-stop;
 				arm,psci-suspend-param = <0x1010000>;
 				entry-latency-us = <600>;
 				exit-latency-us = <1100>;
@@ -148,11 +151,6 @@
 		};
 	};
 
-	cpufreq {
-		compatible = "hisilicon,hisi-acpu-cpufreq";
-		hisilicon,coupled-clusters = <1>;
-	};
-
 	gic: interrupt-controller@f6800000 {
 		compatible = "arm,gic-400", "arm,cortex-a15-gic";
 		reg = <0x0 0xf6801000 0x0 0x1000>, /* GICD */
@@ -165,15 +163,6 @@
 		interrupts = <1 9 0xf04>;
 	};
 
-	clock_acpu: clock_acpu {
-		compatible = "hisilicon,hi6220-clock-stub";
-		#address-cells = <2>;
-		#size-cells = <2>;
-		reg = <0x0 0xFFF81AF4 0x0 0x000C>,
-		      <0x0 0xF7510000 0x0 0x1000>;
-
-		#clock-cells = <1>;
-	};
 
 	ao_ctrl: ao_ctrl {
 		compatible = "hisilicon,aoctrl", "syscon";
@@ -264,6 +253,11 @@
 		interrupt-parent = <&gic>;
 		ranges;
 
+		sram: sram@fff80000 {
+			compatible = "hisilicon,hi6220-sramctrl", "syscon";
+			reg = <0x0 0xfff80000 0x0 0x12000>;
+		};
+
 		uart0: uart@f8015000 {	/* console */
 			compatible = "arm,pl011", "arm,primecell";
 			reg = <0x0 0xf8015000 0x0 0x1000>;
@@ -341,6 +335,23 @@
 			dma-no-cci;
 			dma-type = "hi6220_dma";
 			status = "ok";
+		};
+
+		mailbox: mailbox {
+			#mbox-cells = <1>;
+			compatible = "hisilicon,hi6220-mbox";
+			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
+			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		dual_timer0: dual_timer@f8008000 {
+			compatible = "arm,sp804", "arm,primecell";
+			reg = <0x0 0xf8008000 0x0 0x1000>;
+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clock_ao 31>, <&clock_ao 31>;
+			clock-names = "apb_pclk", "apb_pclk";
 		};
 
 		pmx0: pinmux@f7010000 {
@@ -1124,6 +1135,12 @@
 		interrupts = <0 77 0x4>;
 	};
 
+	stub_clock: stub_clock {
+		compatible = "hisilicon,hi6220-stub-clk";
+		hisilicon,hi6220-clk-sram = <&sram>;
+		#clock-cells = <1>;
+		mboxes = <&mailbox 1>;
+	};
 
 	tsensor: tsensor@0,f7030700 {
 		compatible = "hisilicon,tsensor";

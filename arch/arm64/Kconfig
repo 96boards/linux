@@ -173,6 +173,7 @@ config ARCH_HISI
 	select MFD_HI655X_PMIC
 	select REGULATOR_HI655X
 	select RD_LZO
+	select ARM_TIMER_SP804
 	help
 	  This enables support for Hisilicon ARMv8 Family of SoCs.
 
