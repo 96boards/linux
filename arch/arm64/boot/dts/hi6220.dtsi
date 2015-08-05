@@ -101,6 +101,7 @@
 
 			CPU_SLEEP_0_0: cpu-sleep-0-0 {
 				compatible = "arm,idle-state";
+				local-timer-stop;
 				arm,psci-suspend-param = <0x0010000>;
 				entry-latency-us = <250>;
 				exit-latency-us = <500>;
@@ -109,6 +110,7 @@
 
 			CLUSTER_SLEEP_0: cluster-sleep-0 {
 				compatible = "arm,idle-state";
+				local-timer-stop;
 				arm,psci-suspend-param = <0x1010000>;
 				entry-latency-us = <600>;
 				exit-latency-us = <1100>;
@@ -341,6 +343,15 @@
 			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
 			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		dual_timer0: dual_timer@f8008000 {
+			compatible = "arm,sp804", "arm,primecell";
+			reg = <0x0 0xf8008000 0x0 0x1000>;
+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clock_ao 31>, <&clock_ao 31>;
+			clock-names = "apb_pclk", "apb_pclk";
 		};
 
 		pmx0: pinmux@f7010000 {
