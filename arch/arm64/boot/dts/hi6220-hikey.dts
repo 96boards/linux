@@ -8,7 +8,6 @@
 /dts-v1/;
 
 /memreserve/ 0x00000000 0x07400000;
-/memreserve/ 0x0740f000 0x1000;
 
 #include "hikey-pinctrl.dtsi"
 #include "hikey-gpio.dtsi"
@@ -39,6 +38,23 @@
 	memory {
 		device_type = "memory";
 		reg = <0x0 0x00000000 0x0 0x40000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		mcu-buf@05e00000 {
+			no-map;
+			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+		};
+
+		mbox-buf@06dff000 {
+			no-map;
+			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
+		};
 	};
 
 	smb {
