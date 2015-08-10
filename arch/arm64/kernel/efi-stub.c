@@ -50,7 +50,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
 			memcpy((void *)*reserve_addr, (void *)*image_addr,
 				kernel_size);
 			*image_addr = *reserve_addr;
-			*reserve_size = kernel_memsize;
+			*reserve_size = round_up(kernel_memsize, SZ_64K);
 		} else {
 			status = efi_low_alloc(sys_table_arg,
 						kernel_memsize + TEXT_OFFSET,
@@ -59,7 +59,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
 				memcpy((void *)*reserve_addr + TEXT_OFFSET,
 					(void *)*image_addr, kernel_size);
 				*image_addr = *reserve_addr + TEXT_OFFSET;
-				*reserve_size = kernel_memsize + TEXT_OFFSET;
+				*reserve_size = round_up(kernel_memsize + TEXT_OFFSET, SZ_2M);
 			}
 		}
 		if (status != EFI_SUCCESS) {
