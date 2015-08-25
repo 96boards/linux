@@ -202,7 +202,7 @@ static void hi6220_mbox_init_hw(struct hisi_mbox_hw *mbox_hw)
 
 	for (i = 0; i < HI6220_MBOX_CHAN_NUM; i++) {
 		memcpy(&chan[i], &init_data[i], sizeof(*chan));
-		chan[i].slot = mbox_hw->buf + HI6220_MBOX_CHAN_SLOT_SIZE;
+		chan[i].slot = mbox_hw->buf + HI6220_MBOX_CHAN_SLOT_SIZE * i;
 		chan[i].mbox_hw = mbox_hw;
 	}
 
