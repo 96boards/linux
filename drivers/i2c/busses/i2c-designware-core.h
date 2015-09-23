@@ -100,6 +100,10 @@ struct dw_i2c_dev {
 	u32			sda_hold_time;
 	u32			sda_falling_time;
 	u32			scl_falling_time;
+	u32 reset_enable_off;
+	u32 reset_disable_off;
+	u32 reset_status_off;
+	u32 reset_bit;
 	u16			ss_hcnt;
 	u16			ss_lcnt;
 	u16			fs_hcnt;

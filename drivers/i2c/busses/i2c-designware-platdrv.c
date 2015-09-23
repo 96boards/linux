@@ -40,6 +40,9 @@
 #include <linux/acpi.h>
 #include <linux/platform_data/i2c-designware.h>
 #include "i2c-designware-core.h"
+#include <linux/of_address.h>
+
+static void __iomem *sctrl_base;
 
 static struct i2c_algorithm i2c_dw_algo = {
 	.master_xfer	= i2c_dw_xfer,
@@ -133,18 +136,38 @@ static inline int dw_i2c_acpi_configure(struct platform_device *pdev)
 static inline void dw_i2c_acpi_unconfigure(struct platform_device *pdev) { }
 #endif
 
+/*I2C clock domain enable*/
+static void i2c_clk_domain_enable(struct dw_i2c_dev *dev, unsigned int enable)
+{
+	unsigned int ret;
+	int timeout = 10;
+
+	if (enable)
+		writel(BIT(dev->reset_bit), sctrl_base + dev->reset_enable_off);
+	else
+		writel(BIT(dev->reset_bit), sctrl_base + dev->reset_disable_off);
+
+	do {
+		ret = readl(sctrl_base + dev->reset_status_off);
+		ret &= BIT(dev->reset_bit);
+		udelay(1);
+	} while(!ret && timeout--);
+}
+
 static int dw_i2c_probe(struct platform_device *pdev)
 {
 	struct dw_i2c_dev *dev;
 	struct i2c_adapter *adap;
 	struct resource *mem;
+	struct device_node *node;
 	struct dw_i2c_platform_data *pdata;
 	int irq, r;
-	u32 clk_freq, ht = 0;
+	u32 clk_freq, ht = 0, data[4];
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
+
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct dw_i2c_dev), GFP_KERNEL);
 	if (!dev)
@@ -154,6 +177,19 @@ static int dw_i2c_probe(struct platform_device *pdev)
 	dev->base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(dev->base))
 		return PTR_ERR(dev->base);
+
+	if(!sctrl_base) {
+		node = of_find_compatible_node(NULL, NULL, "hisilicon,hi6220-sysctrl");
+		if (node)
+			sctrl_base = of_iomap(node, 0);
+	}
+
+	of_property_read_u32_array(pdev->dev.of_node, "reset-controller-reg", &data[0], 4);
+
+	dev->reset_enable_off = data[0];
+	dev->reset_disable_off = data[1];
+	dev->reset_status_off = data[2];
+	dev->reset_bit = data[3];
 
 	init_completion(&dev->cmd_complete);
 	mutex_init(&dev->lock);
@@ -215,6 +251,9 @@ static int dw_i2c_probe(struct platform_device *pdev)
 	dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
 	if (IS_ERR(dev->clk))
 		return PTR_ERR(dev->clk);
+
+	i2c_clk_domain_enable(dev, 0);
+
 	clk_prepare_enable(dev->clk);
 
 	if (!dev->sda_hold_time && ht) {
