@@ -993,7 +993,6 @@
 	mali:mali@f4080000 {
 		compatible = "arm,mali-450", "arm,mali-utgard";
 		reg = <0x0 0x3f100000 0x0 0x00708000>;
-		dma-coherent;
 		clocks = <&clock_media HI6220_G3D_CLK>,
 			 <&clock_media HI6220_G3D_PCLK>;
 		clock-names = "clk_g3d", "pclk_g3d";
