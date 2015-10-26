@@ -271,6 +271,16 @@ config HP_ILO
 	  To compile this driver as a module, choose M here: the
 	  module will be called hpilo.
 
+config QCOM_COINCELL
+	tristate "Qualcomm coincell charger support"
+	depends on MFD_SPMI_PMIC || COMPILE_TEST
+	help
+	  This driver supports the coincell block found inside of
+	  Qualcomm PMICs.  The coincell charger provides a means to
+	  charge a coincell battery or backup capacitor which is used
+	  to maintain PMIC register and RTC state in the absence of
+	  external power.
+
 config SGI_GRU
 	tristate "SGI GRU driver"
 	depends on X86_UV && SMP
@@ -515,12 +525,19 @@ config VEXPRESS_SYSCFG
 	  bus. System Configuration interface is one of the possible means
 	  of generating transactions on this bus.
 
+config HI6220_SYSCFG
+	bool "Hisilicon HI6220 System Configuration driver"
+	depends on ARCH_HISI
+	default y
+	help
+	  Hisilicon HI6220 uses some registers to configure some chip hosts to
+          work or not, e.g. disable the UART hosts reset and let's them work.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
-source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/mei/Kconfig"
 source "drivers/misc/vmw_vmci/Kconfig"

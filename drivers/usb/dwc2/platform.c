@@ -47,8 +47,40 @@
 
 #include "core.h"
 #include "hcd.h"
+#include "debug.h"
 
 static const char dwc2_driver_name[] = "dwc2";
+
+static const struct dwc2_core_params params_hi6220 = {
+	.otg_cap			= 2,	/* No HNP/SRP capable */
+	.otg_ver			= 0,	/* 1.3 */
+	.dma_enable			= 1,
+	.dma_desc_enable		= 0,
+	.speed				= 0,	/* High Speed */
+	.enable_dynamic_fifo		= 1,
+	.en_multiple_tx_fifo		= 1,
+	.host_rx_fifo_size		= 512,
+	.host_nperio_tx_fifo_size	= 512,
+	.host_perio_tx_fifo_size	= 512,
+	.max_transfer_size		= 65535,
+	.max_packet_count		= 511,
+	.host_channels			= 16,
+	.phy_type			= 1,	/* UTMI */
+	.phy_utmi_width			= 8,
+	.phy_ulpi_ddr			= 0,	/* Single */
+	.phy_ulpi_ext_vbus		= 0,
+	.i2c_enable			= 0,
+	.ulpi_fs_ls			= 0,
+	.host_support_fs_ls_low_power	= 0,
+	.host_ls_low_power_phy_clk	= 0,	/* 48 MHz */
+	.ts_dline			= 0,
+	.reload_ctl			= 0,
+	.ahbcfg				= GAHBCFG_HBSTLEN_INCR16 <<
+					  GAHBCFG_HBSTLEN_SHIFT,
+	.uframe_sched			= 0,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
+};
 
 static const struct dwc2_core_params params_bcm2835 = {
 	.otg_cap			= 0,	/* HNP/SRP capable */
@@ -76,6 +108,8 @@ static const struct dwc2_core_params params_bcm2835 = {
 	.reload_ctl			= 0,
 	.ahbcfg				= 0x10,
 	.uframe_sched			= 0,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
 };
 
 static const struct dwc2_core_params params_rk3066 = {
@@ -104,6 +138,8 @@ static const struct dwc2_core_params params_rk3066 = {
 	.reload_ctl			= -1,
 	.ahbcfg				= 0x7, /* INCR16 */
 	.uframe_sched			= -1,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
 };
 
 /**
@@ -121,6 +157,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
 {
 	struct dwc2_hsotg *hsotg = platform_get_drvdata(dev);
 
+	dwc2_debugfs_exit(hsotg);
 	if (hsotg->hcd_enabled)
 		dwc2_hcd_remove(hsotg);
 	if (hsotg->gadget_enabled)
@@ -131,6 +168,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
 
 static const struct of_device_id dwc2_of_match_table[] = {
 	{ .compatible = "brcm,bcm2835-usb", .data = &params_bcm2835 },
+	{ .compatible = "hisilicon,hi6220-usb", .data = &params_hi6220 },
 	{ .compatible = "rockchip,rk3066-usb", .data = &params_rk3066 },
 	{ .compatible = "snps,dwc2", .data = NULL },
 	{ .compatible = "samsung,s3c6400-hsotg", .data = NULL},
@@ -200,11 +238,6 @@ static int dwc2_driver_probe(struct platform_device *dev)
 
 	dev_dbg(hsotg->dev, "registering common handler for irq%d\n",
 		irq);
-	retval = devm_request_irq(hsotg->dev, irq,
-				  dwc2_handle_common_intr, IRQF_SHARED,
-				  dev_name(hsotg->dev), hsotg);
-	if (retval)
-		return retval;
 
 	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
 	hsotg->regs = devm_ioremap_resource(&dev->dev, res);
@@ -213,6 +246,12 @@ static int dwc2_driver_probe(struct platform_device *dev)
 
 	dev_dbg(&dev->dev, "mapped PA %08lx to VA %p\n",
 		(unsigned long)res->start, hsotg->regs);
+
+	retval = devm_request_irq(hsotg->dev, irq,
+				  dwc2_handle_common_intr, IRQF_SHARED,
+				  dev_name(hsotg->dev), hsotg);
+	if (retval)
+		return retval;
 
 	hsotg->dr_mode = of_usb_get_dr_mode(dev->dev.of_node);
 
@@ -237,6 +276,21 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	spin_lock_init(&hsotg->lock);
 	mutex_init(&hsotg->init_mutex);
 
+	/* Detect config values from hardware */
+	retval = dwc2_get_hwparams(hsotg);
+	if (retval)
+		return retval;
+
+	hsotg->core_params = devm_kzalloc(&dev->dev,
+				sizeof(*hsotg->core_params), GFP_KERNEL);
+	if (!hsotg->core_params)
+		return -ENOMEM;
+
+	dwc2_set_all_params(hsotg->core_params, -1);
+
+	/* Validate parameter values */
+	dwc2_set_parameters(hsotg, params);
+
 	if (hsotg->dr_mode != USB_DR_MODE_HOST) {
 		retval = dwc2_gadget_init(hsotg, irq);
 		if (retval)
@@ -245,7 +299,7 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	}
 
 	if (hsotg->dr_mode != USB_DR_MODE_PERIPHERAL) {
-		retval = dwc2_hcd_init(hsotg, irq, params);
+		retval = dwc2_hcd_init(hsotg, irq);
 		if (retval) {
 			if (hsotg->gadget_enabled)
 				s3c_hsotg_remove(hsotg);
@@ -255,6 +309,8 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	}
 
 	platform_set_drvdata(dev, hsotg);
+
+	dwc2_debugfs_init(hsotg);
 
 	return retval;
 }

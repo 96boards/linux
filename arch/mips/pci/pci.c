@@ -91,7 +91,10 @@ static void pcibios_scanbus(struct pci_controller *hose)
 
 	pci_add_resource_offset(&resources,
 				hose->mem_resource, hose->mem_offset);
-	pci_add_resource_offset(&resources, hose->io_resource, hose->io_offset);
+	pci_add_resource_offset(&resources,
+				hose->io_resource, hose->io_offset);
+	pci_add_resource_offset(&resources,
+				hose->busn_resource, hose->busn_offset);
 	bus = pci_scan_root_bus(NULL, next_busno, hose->pci_ops, hose,
 				&resources);
 	hose->bus = bus;
@@ -308,12 +311,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 void pcibios_fixup_bus(struct pci_bus *bus)
 {
-	struct pci_dev *dev = bus->self;
-
-	if (pci_has_flag(PCI_PROBE_ONLY) && dev &&
-	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-		pci_read_bridge_bases(bus);
-	}
 }
 
 EXPORT_SYMBOL(PCIBIOS_MIN_IO);

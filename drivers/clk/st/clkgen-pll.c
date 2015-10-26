@@ -16,6 +16,7 @@
 
 #include <linux/slab.h>
 #include <linux/of_address.h>
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 
 #include "clkgen.h"
@@ -270,7 +271,7 @@ static int clkgen_pll_is_enabled(struct clk_hw *hw)
 	return !poweroff;
 }
 
-unsigned long recalc_stm_pll800c65(struct clk_hw *hw,
+static unsigned long recalc_stm_pll800c65(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
 	struct clkgen_pll *pll = to_clkgen_pll(hw);
@@ -291,13 +292,13 @@ unsigned long recalc_stm_pll800c65(struct clk_hw *hw,
 	res = (uint64_t)2 * (uint64_t)parent_rate * (uint64_t)ndiv;
 	rate = (unsigned long)div64_u64(res, mdiv * (1 << pdiv));
 
-	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
+	pr_debug("%s:%s rate %lu\n", clk_hw_get_name(hw), __func__, rate);
 
 	return rate;
 
 }
 
-unsigned long recalc_stm_pll1600c65(struct clk_hw *hw,
+static unsigned long recalc_stm_pll1600c65(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
 	struct clkgen_pll *pll = to_clkgen_pll(hw);
@@ -316,12 +317,12 @@ unsigned long recalc_stm_pll1600c65(struct clk_hw *hw,
 	/* Note: input is divided by 1000 to avoid overflow */
 	rate = ((2 * (parent_rate / 1000) * ndiv) / mdiv) * 1000;
 
-	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
+	pr_debug("%s:%s rate %lu\n", clk_hw_get_name(hw), __func__, rate);
 
 	return rate;
 }
 
-unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
+static unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
 	struct clkgen_pll *pll = to_clkgen_pll(hw);
@@ -338,12 +339,12 @@ unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
 		/* Note: input is divided to avoid overflow */
 		rate = ((2 * (parent_rate/1000) * ndiv) / idf) * 1000;
 
-	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
+	pr_debug("%s:%s rate %lu\n", clk_hw_get_name(hw), __func__, rate);
 
 	return rate;
 }
 
-unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
+static unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
 	struct clkgen_pll *pll = to_clkgen_pll(hw);
@@ -365,7 +366,7 @@ unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
 	/* Note: input is divided by 1000 to avoid overflow */
 	rate = (((parent_rate / 1000) * ldf) / (odf * idf)) * 1000;
 
-	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
+	pr_debug("%s:%s rate %lu\n", clk_hw_get_name(hw), __func__, rate);
 
 	return rate;
 }
@@ -406,7 +407,7 @@ static struct clk * __init clkgen_pll_register(const char *parent_name,
 	init.name = clk_name;
 	init.ops = pll_data->ops;
 
-	init.flags = CLK_IS_BASIC;
+	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
 	init.parent_names = &parent_name;
 	init.num_parents  = 1;
 
@@ -544,7 +545,7 @@ CLK_OF_DECLARE(clkgena_c65_plls,
 	       "st,clkgena-plls-c65", clkgena_c65_pll_setup);
 
 static struct clk * __init clkgen_odf_register(const char *parent_name,
-					       void * __iomem reg,
+					       void __iomem *reg,
 					       struct clkgen_pll_data *pll_data,
 					       int odf,
 					       spinlock_t *odf_lock,
@@ -593,7 +594,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
 	return clk;
 }
 
-static struct of_device_id c32_pll_of_match[] = {
+static const struct of_device_id c32_pll_of_match[] = {
 	{
 		.compatible = "st,plls-c32-a1x-0",
 		.data = &st_pll3200c32_a1x_0,
@@ -708,7 +709,7 @@ err:
 }
 CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
 
-static struct of_device_id c32_gpu_pll_of_match[] = {
+static const struct of_device_id c32_gpu_pll_of_match[] = {
 	{
 		.compatible = "st,stih415-gpu-pll-c32",
 		.data = &st_pll1200c32_gpu_415,

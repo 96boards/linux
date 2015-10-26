@@ -104,6 +104,7 @@
 #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
 #define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
 #define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
+#define PTE_DBM			(_AT(pteval_t, 1) << 51)	/* Dirty Bit Management */
 #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
 #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
 
@@ -143,7 +144,12 @@
 /*
  * TCR flags.
  */
-#define TCR_TxSZ(x)		(((UL(64) - (x)) << 16) | ((UL(64) - (x)) << 0))
+#define TCR_T0SZ_OFFSET		0
+#define TCR_T1SZ_OFFSET		16
+#define TCR_T0SZ(x)		((UL(64) - (x)) << TCR_T0SZ_OFFSET)
+#define TCR_T1SZ(x)		((UL(64) - (x)) << TCR_T1SZ_OFFSET)
+#define TCR_TxSZ(x)		(TCR_T0SZ(x) | TCR_T1SZ(x))
+#define TCR_TxSZ_WIDTH		6
 #define TCR_IRGN_NC		((UL(0) << 8) | (UL(0) << 24))
 #define TCR_IRGN_WBWA		((UL(1) << 8) | (UL(1) << 24))
 #define TCR_IRGN_WT		((UL(2) << 8) | (UL(2) << 24))
@@ -163,5 +169,7 @@
 #define TCR_TG1_64K		(UL(3) << 30)
 #define TCR_ASID16		(UL(1) << 36)
 #define TCR_TBI0		(UL(1) << 37)
+#define TCR_HA			(UL(1) << 39)
+#define TCR_HD			(UL(1) << 40)
 
 #endif

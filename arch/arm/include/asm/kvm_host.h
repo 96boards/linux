@@ -218,11 +218,6 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
 	return 0;
 }
 
-static inline void vgic_arch_setup(const struct vgic_params *vgic)
-{
-	BUG_ON(vgic->type != VGIC_V2);
-}
-
 int kvm_perf_init(void);
 int kvm_perf_teardown(void);
 
@@ -235,5 +230,10 @@ static inline void kvm_arch_hardware_unsetup(void) {}
 static inline void kvm_arch_sync_events(struct kvm *kvm) {}
 static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+
+static inline void kvm_arm_init_debug(void) {}
+static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
 
 #endif /* __ARM_KVM_HOST_H__ */

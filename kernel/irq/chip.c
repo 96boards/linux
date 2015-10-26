@@ -63,7 +63,7 @@ int irq_set_irq_type(unsigned int irq, unsigned int type)
 		return -EINVAL;
 
 	type &= IRQ_TYPE_SENSE_MASK;
-	ret = __irq_set_trigger(desc, irq, type);
+	ret = __irq_set_trigger(desc, type);
 	irq_put_desc_busunlock(desc, flags);
 	return ret;
 }
@@ -187,7 +187,7 @@ int irq_startup(struct irq_desc *desc, bool resend)
 		irq_enable(desc);
 	}
 	if (resend)
-		check_irq_resend(desc, desc->irq_data.irq);
+		check_irq_resend(desc);
 	return ret;
 }
 
@@ -315,7 +315,7 @@ void handle_nested_irq(unsigned int irq)
 	raw_spin_lock_irq(&desc->lock);
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	action = desc->action;
 	if (unlikely(!action || irqd_irq_disabled(&desc->irq_data))) {
@@ -328,7 +328,7 @@ void handle_nested_irq(unsigned int irq)
 
 	action_ret = action->thread_fn(action->irq, action->dev_id);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(desc, action_ret);
 
 	raw_spin_lock_irq(&desc->lock);
 	irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
@@ -391,7 +391,7 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_unlock;
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
 		desc->istate |= IRQS_PENDING;
@@ -443,7 +443,7 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_unlock;
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	/*
 	 * If its disabled or no action available
@@ -515,7 +515,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 		goto out;
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	/*
 	 * If its disabled or no action available
@@ -583,7 +583,7 @@ handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_unlock;
 	}
 
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	/* Start handling the irq */
 	desc->irq_data.chip->irq_ack(&desc->irq_data);
@@ -646,7 +646,7 @@ void handle_edge_eoi_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_eoi;
 	}
 
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	do {
 		if (unlikely(!desc->action))
@@ -675,7 +675,7 @@ handle_percpu_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	if (chip->irq_ack)
 		chip->irq_ack(&desc->irq_data);
@@ -705,7 +705,7 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
 	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
 	irqreturn_t res;
 
-	kstat_incr_irqs_this_cpu(irq, desc);
+	kstat_incr_irqs_this_cpu(desc);
 
 	if (chip->irq_ack)
 		chip->irq_ack(&desc->irq_data);
@@ -719,15 +719,9 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
 }
 
 void
-__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
-		  const char *name)
+__irq_do_set_handler(struct irq_desc *desc, irq_flow_handler_t handle,
+		     int is_chained, const char *name)
 {
-	unsigned long flags;
-	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
-
-	if (!desc)
-		return;
-
 	if (!handle) {
 		handle = handle_bad_irq;
 	} else {
@@ -749,13 +743,13 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 			 * right away.
 			 */
 			if (WARN_ON(is_chained))
-				goto out;
+				return;
 			/* Try the parent */
 			irq_data = irq_data->parent_data;
 		}
 #endif
 		if (WARN_ON(!irq_data || irq_data->chip == &no_irq_chip))
-			goto out;
+			return;
 	}
 
 	/* Uninstall? */
@@ -774,10 +768,39 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 		irq_settings_set_nothread(desc);
 		irq_startup(desc, true);
 	}
-out:
+}
+
+void
+__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
+		  const char *name)
+{
+	unsigned long flags;
+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
+
+	if (!desc)
+		return;
+
+	__irq_do_set_handler(desc, handle, is_chained, name);
 	irq_put_desc_busunlock(desc, flags);
 }
 EXPORT_SYMBOL_GPL(__irq_set_handler);
+
+void
+irq_set_chained_handler_and_data(unsigned int irq, irq_flow_handler_t handle,
+				 void *data)
+{
+	unsigned long flags;
+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
+
+	if (!desc)
+		return;
+
+	__irq_do_set_handler(desc, handle, 1, NULL);
+	desc->irq_data.handler_data = data;
+
+	irq_put_desc_busunlock(desc, flags);
+}
+EXPORT_SYMBOL_GPL(irq_set_chained_handler_and_data);
 
 void
 irq_set_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
@@ -876,6 +899,34 @@ void irq_cpu_offline(void)
 
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
 /**
+ * irq_chip_enable_parent - Enable the parent interrupt (defaults to unmask if
+ * NULL)
+ * @data:	Pointer to interrupt specific data
+ */
+void irq_chip_enable_parent(struct irq_data *data)
+{
+	data = data->parent_data;
+	if (data->chip->irq_enable)
+		data->chip->irq_enable(data);
+	else
+		data->chip->irq_unmask(data);
+}
+
+/**
+ * irq_chip_disable_parent - Disable the parent interrupt (defaults to mask if
+ * NULL)
+ * @data:	Pointer to interrupt specific data
+ */
+void irq_chip_disable_parent(struct irq_data *data)
+{
+	data = data->parent_data;
+	if (data->chip->irq_disable)
+		data->chip->irq_disable(data);
+	else
+		data->chip->irq_mask(data);
+}
+
+/**
  * irq_chip_ack_parent - Acknowledge the parent interrupt
  * @data:	Pointer to interrupt specific data
  */
@@ -934,6 +985,23 @@ int irq_chip_set_affinity_parent(struct irq_data *data,
 }
 
 /**
+ * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
+ * @data:	Pointer to interrupt specific data
+ * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
+ *
+ * Conditional, as the underlying parent chip might not implement it.
+ */
+int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
+{
+	data = data->parent_data;
+
+	if (data->chip->irq_set_type)
+		return data->chip->irq_set_type(data, type);
+
+	return -ENOSYS;
+}
+
+/**
  * irq_chip_retrigger_hierarchy - Retrigger an interrupt in hardware
  * @data:	Pointer to interrupt specific data
  *
@@ -945,6 +1013,20 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
 	for (data = data->parent_data; data; data = data->parent_data)
 		if (data->chip && data->chip->irq_retrigger)
 			return data->chip->irq_retrigger(data);
+
+	return 0;
+}
+
+/**
+ * irq_chip_set_vcpu_affinity_parent - Set vcpu affinity on the parent interrupt
+ * @data:	Pointer to interrupt specific data
+ * @vcpu_info:	The vcpu affinity information
+ */
+int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
+{
+	data = data->parent_data;
+	if (data->chip->irq_set_vcpu_affinity)
+		return data->chip->irq_set_vcpu_affinity(data, vcpu_info);
 
 	return -ENOSYS;
 }

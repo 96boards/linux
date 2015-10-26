@@ -32,13 +32,11 @@
 #include <asm/suspend.h>
 
 #include <plat/pm-common.h>
-#include <plat/regs-srom.h>
 
 #include "common.h"
-#include "regs-pmu.h"
 #include "exynos-pmu.h"
-
-#define S5P_CHECK_SLEEP 0x00000BAD
+#include "regs-pmu.h"
+#include "regs-srom.h"
 
 #define REG_TABLE_END (-1U)
 
@@ -65,8 +63,6 @@ static struct sleep_save exynos_core_save[] = {
 
 struct exynos_pm_data {
 	const struct exynos_wkup_irq *wkup_irq;
-	struct sleep_save *extra_save;
-	int num_extra_save;
 	unsigned int wake_disable_mask;
 	unsigned int *release_ret_regs;
 
@@ -77,7 +73,7 @@ struct exynos_pm_data {
 	int (*cpu_suspend)(unsigned long);
 };
 
-struct exynos_pm_data *pm_data;
+static const struct exynos_pm_data *pm_data;
 
 static int exynos5420_cpu_state;
 static unsigned int exynos_pmu_spare3;
@@ -89,8 +85,8 @@ static unsigned int exynos_pmu_spare3;
 static u32 exynos_irqwake_intmask = 0xffffffff;
 
 static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
-	{ 105, BIT(1) }, /* RTC alarm */
-	{ 106, BIT(2) }, /* RTC tick */
+	{ 73, BIT(1) }, /* RTC alarm */
+	{ 74, BIT(2) }, /* RTC tick */
 	{ /* sentinel */ },
 };
 
@@ -106,7 +102,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
 	{ /* sentinel */ },
 };
 
-unsigned int exynos_release_ret_regs[] = {
+static unsigned int exynos_release_ret_regs[] = {
 	S5P_PAD_RET_MAUDIO_OPTION,
 	S5P_PAD_RET_GPIO_OPTION,
 	S5P_PAD_RET_UART_OPTION,
@@ -117,7 +113,7 @@ unsigned int exynos_release_ret_regs[] = {
 	REG_TABLE_END,
 };
 
-unsigned int exynos3250_release_ret_regs[] = {
+static unsigned int exynos3250_release_ret_regs[] = {
 	S5P_PAD_RET_MAUDIO_OPTION,
 	S5P_PAD_RET_GPIO_OPTION,
 	S5P_PAD_RET_UART_OPTION,
@@ -130,7 +126,7 @@ unsigned int exynos3250_release_ret_regs[] = {
 	REG_TABLE_END,
 };
 
-unsigned int exynos5420_release_ret_regs[] = {
+static unsigned int exynos5420_release_ret_regs[] = {
 	EXYNOS_PAD_RET_DRAM_OPTION,
 	EXYNOS_PAD_RET_MAUDIO_OPTION,
 	EXYNOS_PAD_RET_JTAG_OPTION,
@@ -225,7 +221,7 @@ static int exynos_pmu_domain_alloc(struct irq_domain *domain,
 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
 }
 
-static struct irq_domain_ops exynos_pmu_domain_ops = {
+static const struct irq_domain_ops exynos_pmu_domain_ops = {
 	.xlate	= exynos_pmu_domain_xlate,
 	.alloc	= exynos_pmu_domain_alloc,
 	.free	= irq_domain_free_irqs_common,
@@ -313,13 +309,7 @@ static int exynos5420_cpu_suspend(unsigned long arg)
 
 	if (IS_ENABLED(CONFIG_EXYNOS5420_MCPM)) {
 		mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
-
-		/*
-		 * Residency value passed to mcpm_cpu_suspend back-end
-		 * has to be given clear semantics. Set to 0 as a
-		 * temporary value.
-		 */
-		mcpm_cpu_suspend(0);
+		mcpm_cpu_suspend();
 	}
 
 	pr_info("Failed to suspend the system\n");
@@ -339,19 +329,17 @@ static void exynos_pm_enter_sleep_mode(void)
 {
 	/* Set value of power down register for sleep mode */
 	exynos_sys_powerdown_conf(SYS_SLEEP);
-	pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
+	pmu_raw_writel(EXYNOS_SLEEP_MAGIC, S5P_INFORM1);
 }
 
 static void exynos_pm_prepare(void)
 {
+	exynos_set_delayed_reset_assertion(false);
+
 	/* Set wake-up mask registers */
 	exynos_pm_set_wakeup_mask();
 
 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-
-	 if (pm_data->extra_save)
-		s3c_pm_do_save(pm_data->extra_save,
-				pm_data->num_extra_save);
 
 	exynos_pm_enter_sleep_mode();
 
@@ -475,10 +463,6 @@ static void exynos_pm_resume(void)
 	/* For release retention */
 	exynos_pm_release_retention();
 
-	if (pm_data->extra_save)
-		s3c_pm_do_restore_core(pm_data->extra_save,
-					pm_data->num_extra_save);
-
 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
 
 	if (cpuid == ARM_CPU_PART_CORTEX_A9)
@@ -492,6 +476,7 @@ early_wakeup:
 
 	/* Clear SLEEP mode set in INFORM1 */
 	pmu_raw_writel(0x0, S5P_INFORM1);
+	exynos_set_delayed_reset_assertion(true);
 }
 
 static void exynos3250_pm_resume(void)
@@ -685,7 +670,7 @@ static const struct exynos_pm_data exynos5250_pm_data = {
 	.cpu_suspend	= exynos_cpu_suspend,
 };
 
-static struct exynos_pm_data exynos5420_pm_data = {
+static const struct exynos_pm_data exynos5420_pm_data = {
 	.wkup_irq	= exynos5250_wkup_irq,
 	.wake_disable_mask = (0x7F << 7) | (0x1F << 1),
 	.release_ret_regs = exynos5420_release_ret_regs,
@@ -733,10 +718,12 @@ void __init exynos_pm_init(void)
 		return;
 	}
 
-	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL)))
+	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL))) {
 		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
+		return;
+	}
 
-	pm_data = (struct exynos_pm_data *) match->data;
+	pm_data = (const struct exynos_pm_data *) match->data;
 
 	/* All wakeup disable */
 	tmp = pmu_raw_readl(S5P_WAKEUP_MASK);

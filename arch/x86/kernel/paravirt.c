@@ -154,7 +154,9 @@ unsigned paravirt_patch_default(u8 type, u16 clobbers, void *insnbuf,
 		ret = paravirt_patch_ident_64(insnbuf, len);
 
 	else if (type == PARAVIRT_PATCH(pv_cpu_ops.iret) ||
+#ifdef CONFIG_X86_32
 		 type == PARAVIRT_PATCH(pv_cpu_ops.irq_enable_sysexit) ||
+#endif
 		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret32) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret64))
 		/* If operation requires a jmp, then jmp */
@@ -349,9 +351,7 @@ __visible struct pv_cpu_ops pv_cpu_ops = {
 	.wbinvd = native_wbinvd,
 	.read_msr = native_read_msr_safe,
 	.write_msr = native_write_msr_safe,
-	.read_tsc = native_read_tsc,
 	.read_pmc = native_read_pmc,
-	.read_tscp = native_read_tscp,
 	.load_tr_desc = native_load_tr_desc,
 	.set_ldt = native_set_ldt,
 	.load_gdt = native_load_gdt,
@@ -371,7 +371,7 @@ __visible struct pv_cpu_ops pv_cpu_ops = {
 
 	.load_sp0 = native_load_sp0,
 
-#if defined(CONFIG_X86_32) || defined(CONFIG_IA32_EMULATION)
+#if defined(CONFIG_X86_32)
 	.irq_enable_sysexit = native_irq_enable_sysexit,
 #endif
 #ifdef CONFIG_X86_64

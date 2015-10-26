@@ -318,17 +318,6 @@ get_sigframe(struct ksignal *ksig, struct pt_regs *regs, int framesize)
 	return frame;
 }
 
-/*
- * translate the signal
- */
-static inline int map_sig(int sig)
-{
-	struct thread_info *thread = current_thread_info();
-	if (sig < 32 && thread->exec_domain && thread->exec_domain->signal_invmap)
-		sig = thread->exec_domain->signal_invmap[sig];
-	return sig;
-}
-
 static int
 setup_return(struct pt_regs *regs, struct ksignal *ksig,
 	     unsigned long __user *rc, void __user *frame)
@@ -412,7 +401,7 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
 		}
 	}
 
-	regs->ARM_r0 = map_sig(ksig->sig);
+	regs->ARM_r0 = ksig->sig;
 	regs->ARM_sp = (unsigned long)frame;
 	regs->ARM_lr = retcode;
 	regs->ARM_pc = handler;
@@ -573,6 +562,12 @@ static int do_signal(struct pt_regs *regs, int syscall)
 asmlinkage int
 do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 {
+	/*
+	 * The assembly code enters us with IRQs off, but it hasn't
+	 * informed the tracing code of that for efficiency reasons.
+	 * Update the trace code with the current status.
+	 */
+	trace_hardirqs_off();
 	do {
 		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
 			schedule();

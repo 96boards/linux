@@ -175,7 +175,9 @@ static __init void early_serial_init(char *s)
 	}
 
 	if (*s) {
-		if (kstrtoul(s, 0, &baud) < 0 || baud == 0)
+		baud = simple_strtoull(s, &e, 0);
+
+		if (baud == 0 || s == e)
 			baud = DEFAULT_BAUD;
 	}
 
@@ -374,12 +376,6 @@ static int __init setup_early_printk(char *buf)
 #ifdef CONFIG_HVC_XEN
 		if (!strncmp(buf, "xen", 3))
 			early_console_register(&xenboot_console, keep);
-#endif
-#ifdef CONFIG_EARLY_PRINTK_INTEL_MID
-		if (!strncmp(buf, "hsu", 3)) {
-			hsu_early_console_init(buf + 3);
-			early_console_register(&early_hsu_console, keep);
-		}
 #endif
 #ifdef CONFIG_EARLY_PRINTK_EFI
 		if (!strncmp(buf, "efi", 3))

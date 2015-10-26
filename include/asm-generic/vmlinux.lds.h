@@ -153,6 +153,14 @@
 #define TRACE_SYSCALLS()
 #endif
 
+#ifdef CONFIG_SERIAL_EARLYCON
+#define EARLYCON_TABLE() STRUCT_ALIGN();			\
+			 VMLINUX_SYMBOL(__earlycon_table) = .;	\
+			 *(__earlycon_table)			\
+			 *(__earlycon_table_end)
+#else
+#define EARLYCON_TABLE()
+#endif
 
 #define ___OF_TABLE(cfg, name)	_OF_TABLE_##cfg(name)
 #define __OF_TABLE(cfg, name)	___OF_TABLE(cfg, name)
@@ -404,12 +412,10 @@
  * during second ld run in second ld pass when generating System.map */
 #define TEXT_TEXT							\
 		ALIGN_FUNCTION();					\
-		*(.text.hot)						\
-		*(.text .text.fixup)					\
+		*(.text.hot .text .text.fixup .text.unlikely)		\
 		*(.ref.text)						\
 	MEM_KEEP(init.text)						\
 	MEM_KEEP(exit.text)						\
-		*(.text.unlikely)
 
 
 /* sched.text is aling to function alignment to secure we have same
@@ -508,6 +514,7 @@
 	CPUIDLE_METHOD_OF_TABLES()					\
 	KERNEL_DTB()							\
 	IRQCHIP_OF_MATCH_TABLE()					\
+	EARLYCON_TABLE()						\
 	EARLYCON_OF_TABLES()
 
 #define INIT_TEXT							\

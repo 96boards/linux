@@ -18,6 +18,23 @@
 /* Temparory solution for building, will be removed later */
 #include <linux/pci.h>
 
+struct msi_desc *alloc_msi_entry(struct device *dev)
+{
+	struct msi_desc *desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+	if (!desc)
+		return NULL;
+
+	INIT_LIST_HEAD(&desc->list);
+	desc->dev = dev;
+
+	return desc;
+}
+
+void free_msi_entry(struct msi_desc *entry)
+{
+	kfree(entry);
+}
+
 void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
 	*msg = entry->msg;
@@ -124,7 +141,7 @@ static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
 	irq_domain_free_irqs_top(domain, virq, nr_irqs);
 }
 
-static struct irq_domain_ops msi_domain_ops = {
+static const struct irq_domain_ops msi_domain_ops = {
 	.alloc		= msi_domain_alloc,
 	.free		= msi_domain_free,
 	.activate	= msi_domain_activate,

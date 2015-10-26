@@ -163,7 +163,7 @@ static unsigned int iic_get_irq(void)
 
 void iic_setup_cpu(void)
 {
-	out_be64(this_cpu_ptr(&cpu_iic.regs->prio), 0xff);
+	out_be64(&this_cpu_ptr(&cpu_iic)->regs->prio, 0xff);
 }
 
 u8 iic_get_target_id(int cpu)
@@ -222,7 +222,8 @@ void iic_request_IPIs(void)
 #endif /* CONFIG_SMP */
 
 
-static int iic_host_match(struct irq_domain *h, struct device_node *node)
+static int iic_host_match(struct irq_domain *h, struct device_node *node,
+			  enum irq_domain_bus_token bus_token)
 {
 	return of_device_is_compatible(node,
 				    "IBM,CBEA-Internal-Interrupt-Controller");

@@ -29,7 +29,6 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/platform_data/irq-renesas-irqc.h>
 #include <linux/pm_runtime.h>
 
 #define IRQC_IRQ_MAX	32	/* maximum 32 interrupts per driver instance */
@@ -54,7 +53,6 @@
 struct irqc_irq {
 	int hw_irq;
 	int requested_irq;
-	int domain_irq;
 	struct irqc_priv *p;
 };
 
@@ -62,7 +60,6 @@ struct irqc_priv {
 	void __iomem *iomem;
 	void __iomem *cpu_int_base;
 	struct irqc_irq irq[IRQC_IRQ_MAX];
-	struct renesas_irqc_config config;
 	unsigned int number_of_irqs;
 	struct platform_device *pdev;
 	struct irq_chip irq_chip;
@@ -72,8 +69,8 @@ struct irqc_priv {
 
 static void irqc_dbg(struct irqc_irq *i, char *str)
 {
-	dev_dbg(&i->p->pdev->dev, "%s (%d:%d:%d)\n",
-		str, i->requested_irq, i->hw_irq, i->domain_irq);
+	dev_dbg(&i->p->pdev->dev, "%s (%d:%d)\n",
+		str, i->requested_irq, i->hw_irq);
 }
 
 static void irqc_irq_enable(struct irq_data *d)
@@ -147,7 +144,7 @@ static irqreturn_t irqc_irq_handler(int irq, void *dev_id)
 	if (ioread32(p->iomem + DETECT_STATUS) & bit) {
 		iowrite32(bit, p->iomem + DETECT_STATUS);
 		irqc_dbg(i, "demux2");
-		generic_handle_irq(i->domain_irq);
+		generic_handle_irq(irq_find_mapping(p->irq_domain, i->hw_irq));
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;
@@ -158,24 +155,19 @@ static int irqc_irq_domain_map(struct irq_domain *h, unsigned int virq,
 {
 	struct irqc_priv *p = h->host_data;
 
-	p->irq[hw].domain_irq = virq;
-	p->irq[hw].hw_irq = hw;
-
 	irqc_dbg(&p->irq[hw], "map");
 	irq_set_chip_data(virq, h->host_data);
 	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
-	set_irq_flags(virq, IRQF_VALID); /* kill me now */
 	return 0;
 }
 
-static struct irq_domain_ops irqc_irq_domain_ops = {
+static const struct irq_domain_ops irqc_irq_domain_ops = {
 	.map	= irqc_irq_domain_map,
 	.xlate  = irq_domain_xlate_twocell,
 };
 
 static int irqc_probe(struct platform_device *pdev)
 {
-	struct renesas_irqc_config *pdata = pdev->dev.platform_data;
 	struct irqc_priv *p;
 	struct resource *io;
 	struct resource *irq;
@@ -190,10 +182,6 @@ static int irqc_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err0;
 	}
-
-	/* deal with driver instance configuration */
-	if (pdata)
-		memcpy(&p->config, pdata, sizeof(*pdata));
 
 	p->pdev = pdev;
 	platform_set_drvdata(pdev, p);
@@ -222,6 +210,7 @@ static int irqc_probe(struct platform_device *pdev)
 			break;
 
 		p->irq[k].p = p;
+		p->irq[k].hw_irq = k;
 		p->irq[k].requested_irq = irq->start;
 	}
 
@@ -250,9 +239,8 @@ static int irqc_probe(struct platform_device *pdev)
 	irq_chip->irq_set_wake = irqc_irq_set_wake;
 	irq_chip->flags	= IRQCHIP_MASK_ON_SUSPEND;
 
-	p->irq_domain = irq_domain_add_simple(pdev->dev.of_node,
+	p->irq_domain = irq_domain_add_linear(pdev->dev.of_node,
 					      p->number_of_irqs,
-					      p->config.irq_base,
 					      &irqc_irq_domain_ops, p);
 	if (!p->irq_domain) {
 		ret = -ENXIO;
@@ -271,13 +259,6 @@ static int irqc_probe(struct platform_device *pdev)
 	}
 
 	dev_info(&pdev->dev, "driving %d irqs\n", p->number_of_irqs);
-
-	/* warn in case of mismatch if irq base is specified */
-	if (p->config.irq_base) {
-		if (p->config.irq_base != p->irq[0].domain_irq)
-			dev_warn(&pdev->dev, "irq base mismatch (%d/%d)\n",
-				 p->config.irq_base, p->irq[0].domain_irq);
-	}
 
 	return 0;
 err3:

@@ -37,6 +37,7 @@
 #include <linux/gfp.h>
 #include <linux/balloon_compaction.h>
 #include <linux/mmu_notifier.h>
+#include <linux/page_idle.h>
 
 #include <asm/tlbflush.h>
 
@@ -524,6 +525,11 @@ void migrate_page_copy(struct page *newpage, struct page *page)
 			__set_page_dirty_nobuffers(newpage);
  	}
 
+	if (page_is_young(page))
+		set_page_young(newpage);
+	if (page_is_idle(page))
+		set_page_idle(newpage);
+
 	/*
 	 * Copy NUMA information to the new page, to prevent over-eager
 	 * future migrations of this same page.
@@ -537,7 +543,8 @@ void migrate_page_copy(struct page *newpage, struct page *page)
 	 * Please do not reorder this without considering how mm/ksm.c's
 	 * get_ksm_page() depends upon ksm_migrate_page() and PageSwapCache().
 	 */
-	ClearPageSwapCache(page);
+	if (PageSwapCache(page))
+		ClearPageSwapCache(page);
 	ClearPagePrivate(page);
 	set_page_private(page, 0);
 
@@ -917,7 +924,8 @@ out:
 static ICE_noinline int unmap_and_move(new_page_t get_new_page,
 				   free_page_t put_new_page,
 				   unsigned long private, struct page *page,
-				   int force, enum migrate_mode mode)
+				   int force, enum migrate_mode mode,
+				   enum migrate_reason reason)
 {
 	int rc = 0;
 	int *result = NULL;
@@ -948,7 +956,13 @@ out:
 		list_del(&page->lru);
 		dec_zone_page_state(page, NR_ISOLATED_ANON +
 				page_is_file_cache(page));
-		putback_lru_page(page);
+		/* Soft-offlined page shouldn't go through lru cache list */
+		if (reason == MR_MEMORY_FAILURE) {
+			put_page(page);
+			if (!test_set_page_hwpoison(page))
+				num_poisoned_pages_inc();
+		} else
+			putback_lru_page(page);
 	}
 
 	/*
@@ -1121,7 +1135,8 @@ int migrate_pages(struct list_head *from, new_page_t get_new_page,
 						pass > 2, mode);
 			else
 				rc = unmap_and_move(get_new_page, put_new_page,
-						private, page, pass > 2, mode);
+						private, page, pass > 2, mode,
+						reason);
 
 			switch(rc) {
 			case -ENOMEM:
@@ -1186,7 +1201,7 @@ static struct page *new_page_node(struct page *p, unsigned long private,
 		return alloc_huge_page_node(page_hstate(compound_head(p)),
 					pm->node);
 	else
-		return alloc_pages_exact_node(pm->node,
+		return __alloc_pages_node(pm->node,
 				GFP_HIGHUSER_MOVABLE | __GFP_THISNODE, 0);
 }
 
@@ -1218,7 +1233,9 @@ static int do_move_page_to_node_array(struct mm_struct *mm,
 		if (!vma || pp->addr < vma->vm_start || !vma_migratable(vma))
 			goto set_status;
 
-		page = follow_page(vma, pp->addr, FOLL_GET|FOLL_SPLIT);
+		/* FOLL_DUMP to ignore special (like zero) pages */
+		page = follow_page(vma, pp->addr,
+				FOLL_GET | FOLL_SPLIT | FOLL_DUMP);
 
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
@@ -1227,10 +1244,6 @@ static int do_move_page_to_node_array(struct mm_struct *mm,
 		err = -ENOENT;
 		if (!page)
 			goto set_status;
-
-		/* Use PageReserved to check for zero page */
-		if (PageReserved(page))
-			goto put_and_set;
 
 		pp->page = page;
 		err = page_to_nid(page);
@@ -1388,18 +1401,14 @@ static void do_pages_stat_array(struct mm_struct *mm, unsigned long nr_pages,
 		if (!vma || addr < vma->vm_start)
 			goto set_status;
 
-		page = follow_page(vma, addr, 0);
+		/* FOLL_DUMP to ignore special (like zero) pages */
+		page = follow_page(vma, addr, FOLL_DUMP);
 
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
 			goto set_status;
 
-		err = -ENOENT;
-		/* Use PageReserved to check for zero page */
-		if (!page || PageReserved(page))
-			goto set_status;
-
-		err = page_to_nid(page);
+		err = page ? page_to_nid(page) : -ENOENT;
 set_status:
 		*status = err;
 
@@ -1552,7 +1561,7 @@ static struct page *alloc_misplaced_dst_page(struct page *page,
 	int nid = (int) data;
 	struct page *newpage;
 
-	newpage = alloc_pages_exact_node(nid,
+	newpage = __alloc_pages_node(nid,
 					 (GFP_HIGHUSER_MOVABLE |
 					  __GFP_THISNODE | __GFP_NOMEMALLOC |
 					  __GFP_NORETRY | __GFP_NOWARN) &
@@ -1795,7 +1804,7 @@ fail_putback:
 	 */
 	flush_cache_range(vma, mmun_start, mmun_end);
 	page_add_anon_rmap(new_page, vma, mmun_start);
-	pmdp_clear_flush_notify(vma, mmun_start, pmd);
+	pmdp_huge_clear_flush_notify(vma, mmun_start, pmd);
 	set_pmd_at(mm, mmun_start, pmd, entry);
 	flush_tlb_range(vma, mmun_start, mmun_end);
 	update_mmu_cache_pmd(vma, address, &entry);

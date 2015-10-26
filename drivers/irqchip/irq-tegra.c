@@ -24,14 +24,13 @@
 
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/syscore_ops.h>
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
-
-#include "irqchip.h"
 
 #define ICTLR_CPU_IEP_VFIQ	0x08
 #define ICTLR_CPU_IEP_FIR	0x14
@@ -264,7 +263,7 @@ static int tegra_ictlr_domain_alloc(struct irq_domain *domain,
 
 		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
 					      &tegra_ictlr_chip,
-					      &info->base[ictlr]);
+					      info->base[ictlr]);
 	}
 
 	parent_args = *args;

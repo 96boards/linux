@@ -98,6 +98,7 @@ static void perf_evlist__purge(struct perf_evlist *evlist)
 
 	evlist__for_each_safe(evlist, n, pos) {
 		list_del_init(&pos->node);
+		pos->evlist = NULL;
 		perf_evsel__delete(pos);
 	}
 
@@ -114,8 +115,8 @@ void perf_evlist__delete(struct perf_evlist *evlist)
 {
 	perf_evlist__munmap(evlist);
 	perf_evlist__close(evlist);
-	cpu_map__delete(evlist->cpus);
-	thread_map__delete(evlist->threads);
+	cpu_map__put(evlist->cpus);
+	thread_map__put(evlist->threads);
 	evlist->cpus = NULL;
 	evlist->threads = NULL;
 	perf_evlist__purge(evlist);
@@ -125,6 +126,7 @@ void perf_evlist__delete(struct perf_evlist *evlist)
 
 void perf_evlist__add(struct perf_evlist *evlist, struct perf_evsel *entry)
 {
+	entry->evlist = evlist;
 	list_add_tail(&entry->node, &evlist->entries);
 	entry->idx = evlist->nr_entries;
 	entry->tracking = !entry->idx;
@@ -297,6 +299,8 @@ void perf_evlist__disable(struct perf_evlist *evlist)
 				      PERF_EVENT_IOC_DISABLE, 0);
 		}
 	}
+
+	evlist->enabled = false;
 }
 
 void perf_evlist__enable(struct perf_evlist *evlist)
@@ -316,6 +320,13 @@ void perf_evlist__enable(struct perf_evlist *evlist)
 				      PERF_EVENT_IOC_ENABLE, 0);
 		}
 	}
+
+	evlist->enabled = true;
+}
+
+void perf_evlist__toggle_enable(struct perf_evlist *evlist)
+{
+	(evlist->enabled ? perf_evlist__disable : perf_evlist__enable)(evlist);
 }
 
 int perf_evlist__disable_event(struct perf_evlist *evlist,
@@ -539,7 +550,7 @@ static void perf_evlist__set_sid_idx(struct perf_evlist *evlist,
 	else
 		sid->cpu = -1;
 	if (!evsel->system_wide && evlist->threads && thread >= 0)
-		sid->tid = evlist->threads->map[thread];
+		sid->tid = thread_map__pid(evlist->threads, thread);
 	else
 		sid->tid = -1;
 }
@@ -564,7 +575,7 @@ struct perf_evsel *perf_evlist__id2evsel(struct perf_evlist *evlist, u64 id)
 {
 	struct perf_sample_id *sid;
 
-	if (evlist->nr_entries == 1)
+	if (evlist->nr_entries == 1 || !id)
 		return perf_evlist__first(evlist);
 
 	sid = perf_evlist__id2sid(evlist, id);
@@ -634,11 +645,18 @@ static struct perf_evsel *perf_evlist__event2evsel(struct perf_evlist *evlist,
 union perf_event *perf_evlist__mmap_read(struct perf_evlist *evlist, int idx)
 {
 	struct perf_mmap *md = &evlist->mmap[idx];
-	u64 head = perf_mmap__read_head(md);
+	u64 head;
 	u64 old = md->prev;
 	unsigned char *data = md->base + page_size;
 	union perf_event *event = NULL;
 
+	/*
+	 * Check if event was unmapped due to a POLLHUP/POLLERR.
+	 */
+	if (!atomic_read(&md->refcnt))
+		return NULL;
+
+	head = perf_mmap__read_head(md);
 	if (evlist->overwrite) {
 		/*
 		 * If we're further behind than half the buffer, there's a chance
@@ -695,19 +713,19 @@ union perf_event *perf_evlist__mmap_read(struct perf_evlist *evlist, int idx)
 
 static bool perf_mmap__empty(struct perf_mmap *md)
 {
-	return perf_mmap__read_head(md) == md->prev;
+	return perf_mmap__read_head(md) == md->prev && !md->auxtrace_mmap.base;
 }
 
 static void perf_evlist__mmap_get(struct perf_evlist *evlist, int idx)
 {
-	++evlist->mmap[idx].refcnt;
+	atomic_inc(&evlist->mmap[idx].refcnt);
 }
 
 static void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx)
 {
-	BUG_ON(evlist->mmap[idx].refcnt == 0);
+	BUG_ON(atomic_read(&evlist->mmap[idx].refcnt) == 0);
 
-	if (--evlist->mmap[idx].refcnt == 0)
+	if (atomic_dec_and_test(&evlist->mmap[idx].refcnt))
 		__perf_evlist__munmap(evlist, idx);
 }
 
@@ -721,8 +739,36 @@ void perf_evlist__mmap_consume(struct perf_evlist *evlist, int idx)
 		perf_mmap__write_tail(md, old);
 	}
 
-	if (md->refcnt == 1 && perf_mmap__empty(md))
+	if (atomic_read(&md->refcnt) == 1 && perf_mmap__empty(md))
 		perf_evlist__mmap_put(evlist, idx);
+}
+
+int __weak auxtrace_mmap__mmap(struct auxtrace_mmap *mm __maybe_unused,
+			       struct auxtrace_mmap_params *mp __maybe_unused,
+			       void *userpg __maybe_unused,
+			       int fd __maybe_unused)
+{
+	return 0;
+}
+
+void __weak auxtrace_mmap__munmap(struct auxtrace_mmap *mm __maybe_unused)
+{
+}
+
+void __weak auxtrace_mmap_params__init(
+			struct auxtrace_mmap_params *mp __maybe_unused,
+			off_t auxtrace_offset __maybe_unused,
+			unsigned int auxtrace_pages __maybe_unused,
+			bool auxtrace_overwrite __maybe_unused)
+{
+}
+
+void __weak auxtrace_mmap_params__set_idx(
+			struct auxtrace_mmap_params *mp __maybe_unused,
+			struct perf_evlist *evlist __maybe_unused,
+			int idx __maybe_unused,
+			bool per_cpu __maybe_unused)
+{
 }
 
 static void __perf_evlist__munmap(struct perf_evlist *evlist, int idx)
@@ -730,8 +776,9 @@ static void __perf_evlist__munmap(struct perf_evlist *evlist, int idx)
 	if (evlist->mmap[idx].base != NULL) {
 		munmap(evlist->mmap[idx].base, evlist->mmap_len);
 		evlist->mmap[idx].base = NULL;
-		evlist->mmap[idx].refcnt = 0;
+		atomic_set(&evlist->mmap[idx].refcnt, 0);
 	}
+	auxtrace_mmap__munmap(&evlist->mmap[idx].auxtrace_mmap);
 }
 
 void perf_evlist__munmap(struct perf_evlist *evlist)
@@ -759,6 +806,7 @@ static int perf_evlist__alloc_mmap(struct perf_evlist *evlist)
 struct mmap_params {
 	int prot;
 	int mask;
+	struct auxtrace_mmap_params auxtrace_mp;
 };
 
 static int __perf_evlist__mmap(struct perf_evlist *evlist, int idx,
@@ -777,7 +825,7 @@ static int __perf_evlist__mmap(struct perf_evlist *evlist, int idx,
 	 * evlist layer can't just drop it when filtering events in
 	 * perf_evlist__filter_pollfd().
 	 */
-	evlist->mmap[idx].refcnt = 2;
+	atomic_set(&evlist->mmap[idx].refcnt, 2);
 	evlist->mmap[idx].prev = 0;
 	evlist->mmap[idx].mask = mp->mask;
 	evlist->mmap[idx].base = mmap(NULL, evlist->mmap_len, mp->prot,
@@ -788,6 +836,10 @@ static int __perf_evlist__mmap(struct perf_evlist *evlist, int idx,
 		evlist->mmap[idx].base = NULL;
 		return -1;
 	}
+
+	if (auxtrace_mmap__mmap(&evlist->mmap[idx].auxtrace_mmap,
+				&mp->auxtrace_mp, evlist->mmap[idx].base, fd))
+		return -1;
 
 	return 0;
 }
@@ -853,6 +905,9 @@ static int perf_evlist__mmap_per_cpu(struct perf_evlist *evlist,
 	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		int output = -1;
 
+		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, cpu,
+					      true);
+
 		for (thread = 0; thread < nr_threads; thread++) {
 			if (perf_evlist__mmap_per_evsel(evlist, cpu, mp, cpu,
 							thread, &output))
@@ -877,6 +932,9 @@ static int perf_evlist__mmap_per_thread(struct perf_evlist *evlist,
 	pr_debug2("perf event ring buffer mmapped per thread\n");
 	for (thread = 0; thread < nr_threads; thread++) {
 		int output = -1;
+
+		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, thread,
+					      false);
 
 		if (perf_evlist__mmap_per_evsel(evlist, thread, mp, 0, thread,
 						&output))
@@ -960,10 +1018,8 @@ static long parse_pages_arg(const char *str, unsigned long min,
 	return pages;
 }
 
-int perf_evlist__parse_mmap_pages(const struct option *opt, const char *str,
-				  int unset __maybe_unused)
+int __perf_evlist__parse_mmap_pages(unsigned int *mmap_pages, const char *str)
 {
-	unsigned int *mmap_pages = opt->value;
 	unsigned long max = UINT_MAX;
 	long pages;
 
@@ -980,20 +1036,32 @@ int perf_evlist__parse_mmap_pages(const struct option *opt, const char *str,
 	return 0;
 }
 
+int perf_evlist__parse_mmap_pages(const struct option *opt, const char *str,
+				  int unset __maybe_unused)
+{
+	return __perf_evlist__parse_mmap_pages(opt->value, str);
+}
+
 /**
- * perf_evlist__mmap - Create mmaps to receive events.
+ * perf_evlist__mmap_ex - Create mmaps to receive events.
  * @evlist: list of events
  * @pages: map length in pages
  * @overwrite: overwrite older events?
+ * @auxtrace_pages - auxtrace map length in pages
+ * @auxtrace_overwrite - overwrite older auxtrace data?
  *
  * If @overwrite is %false the user needs to signal event consumption using
  * perf_mmap__write_tail().  Using perf_evlist__mmap_read() does this
  * automatically.
  *
+ * Similarly, if @auxtrace_overwrite is %false the user needs to signal data
+ * consumption using auxtrace_mmap__write_tail().
+ *
  * Return: %0 on success, negative error code otherwise.
  */
-int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages,
-		      bool overwrite)
+int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
+			 bool overwrite, unsigned int auxtrace_pages,
+			 bool auxtrace_overwrite)
 {
 	struct perf_evsel *evsel;
 	const struct cpu_map *cpus = evlist->cpus;
@@ -1013,6 +1081,9 @@ int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages,
 	pr_debug("mmap size %zuB\n", evlist->mmap_len);
 	mp.mask = evlist->mmap_len - page_size - 1;
 
+	auxtrace_mmap_params__init(&mp.auxtrace_mp, evlist->mmap_len,
+				   auxtrace_pages, auxtrace_overwrite);
+
 	evlist__for_each(evlist, evsel) {
 		if ((evsel->attr.read_format & PERF_FORMAT_ID) &&
 		    evsel->sample_id == NULL &&
@@ -1024,6 +1095,38 @@ int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages,
 		return perf_evlist__mmap_per_thread(evlist, &mp);
 
 	return perf_evlist__mmap_per_cpu(evlist, &mp);
+}
+
+int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages,
+		      bool overwrite)
+{
+	return perf_evlist__mmap_ex(evlist, pages, overwrite, 0, false);
+}
+
+static int perf_evlist__propagate_maps(struct perf_evlist *evlist,
+				       bool has_user_cpus)
+{
+	struct perf_evsel *evsel;
+
+	evlist__for_each(evlist, evsel) {
+		/*
+		 * We already have cpus for evsel (via PMU sysfs) so
+		 * keep it, if there's no target cpu list defined.
+		 */
+		if (evsel->cpus && has_user_cpus)
+			cpu_map__put(evsel->cpus);
+
+		if (!evsel->cpus || has_user_cpus)
+			evsel->cpus = cpu_map__get(evlist->cpus);
+
+		evsel->threads = thread_map__get(evlist->threads);
+
+		if ((evlist->cpus && !evsel->cpus) ||
+		    (evlist->threads && !evsel->threads))
+			return -ENOMEM;
+	}
+
+	return 0;
 }
 
 int perf_evlist__create_maps(struct perf_evlist *evlist, struct target *target)
@@ -1042,12 +1145,29 @@ int perf_evlist__create_maps(struct perf_evlist *evlist, struct target *target)
 	if (evlist->cpus == NULL)
 		goto out_delete_threads;
 
-	return 0;
+	return perf_evlist__propagate_maps(evlist, !!target->cpu_list);
 
 out_delete_threads:
-	thread_map__delete(evlist->threads);
+	thread_map__put(evlist->threads);
 	evlist->threads = NULL;
 	return -1;
+}
+
+int perf_evlist__set_maps(struct perf_evlist *evlist,
+			  struct cpu_map *cpus,
+			  struct thread_map *threads)
+{
+	if (evlist->cpus)
+		cpu_map__put(evlist->cpus);
+
+	evlist->cpus = cpus;
+
+	if (evlist->threads)
+		thread_map__put(evlist->threads);
+
+	evlist->threads = threads;
+
+	return perf_evlist__propagate_maps(evlist, false);
 }
 
 int perf_evlist__apply_filters(struct perf_evlist *evlist, struct perf_evsel **err_evsel)
@@ -1061,7 +1181,11 @@ int perf_evlist__apply_filters(struct perf_evlist *evlist, struct perf_evsel **e
 		if (evsel->filter == NULL)
 			continue;
 
-		err = perf_evsel__set_filter(evsel, ncpus, nthreads, evsel->filter);
+		/*
+		 * filters only work for tracepoint event, which doesn't have cpu limit.
+		 * So evlist and evsel should always be same.
+		 */
+		err = perf_evsel__apply_filter(evsel, ncpus, nthreads, evsel->filter);
 		if (err) {
 			*err_evsel = evsel;
 			break;
@@ -1075,11 +1199,9 @@ int perf_evlist__set_filter(struct perf_evlist *evlist, const char *filter)
 {
 	struct perf_evsel *evsel;
 	int err = 0;
-	const int ncpus = cpu_map__nr(evlist->cpus),
-		  nthreads = thread_map__nr(evlist->threads);
 
 	evlist__for_each(evlist, evsel) {
-		err = perf_evsel__set_filter(evsel, ncpus, nthreads, filter);
+		err = perf_evsel__set_filter(evsel, filter);
 		if (err)
 			break;
 	}
@@ -1155,6 +1277,16 @@ u64 perf_evlist__combined_sample_type(struct perf_evlist *evlist)
 {
 	evlist->combined_sample_type = 0;
 	return __perf_evlist__combined_sample_type(evlist);
+}
+
+u64 perf_evlist__combined_branch_type(struct perf_evlist *evlist)
+{
+	struct perf_evsel *evsel;
+	u64 branch_type = 0;
+
+	evlist__for_each(evlist, evsel)
+		branch_type |= evsel->attr.branch_sample_type;
+	return branch_type;
 }
 
 bool perf_evlist__valid_read_format(struct perf_evlist *evlist)
@@ -1278,7 +1410,7 @@ static int perf_evlist__create_syswide_maps(struct perf_evlist *evlist)
 out:
 	return err;
 out_free_cpus:
-	cpu_map__delete(evlist->cpus);
+	cpu_map__put(evlist->cpus);
 	evlist->cpus = NULL;
 	goto out;
 }
@@ -1400,7 +1532,7 @@ int perf_evlist__prepare_workload(struct perf_evlist *evlist, struct target *tar
 				__func__, __LINE__);
 			goto out_close_pipes;
 		}
-		evlist->threads->map[0] = evlist->workload.pid;
+		thread_map__set_pid(evlist->threads, 0, evlist->workload.pid);
 	}
 
 	close(child_ready_pipe[1]);

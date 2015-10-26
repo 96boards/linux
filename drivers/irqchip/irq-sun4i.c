@@ -16,14 +16,13 @@
 
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/irqchip.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 
 #include <asm/exception.h>
 #include <asm/mach/irq.h>
-
-#include "irqchip.h"
 
 #define SUN4I_IRQ_VECTOR_REG		0x00
 #define SUN4I_IRQ_PROTECTION_REG	0x08
@@ -89,7 +88,7 @@ static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
 	return 0;
 }
 
-static struct irq_domain_ops sun4i_irq_ops = {
+static const struct irq_domain_ops sun4i_irq_ops = {
 	.map = sun4i_irq_map,
 	.xlate = irq_domain_xlate_onecell,
 };

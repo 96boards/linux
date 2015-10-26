@@ -627,7 +627,7 @@ static struct vfsmount *pipe_mnt __read_mostly;
 static char *pipefs_dname(struct dentry *dentry, char *buffer, int buflen)
 {
 	return dynamic_dname(dentry, buffer, buflen, "pipe:[%lu]",
-				dentry->d_inode->i_ino);
+				d_inode(dentry)->i_ino);
 }
 
 static const struct dentry_operations pipefs_dentry_operations = {
@@ -946,9 +946,7 @@ err:
 const struct file_operations pipefifo_fops = {
 	.open		= fifo_open,
 	.llseek		= no_llseek,
-	.read		= new_sync_read,
 	.read_iter	= pipe_read,
-	.write		= new_sync_write,
 	.write_iter	= pipe_write,
 	.poll		= pipe_poll,
 	.unlocked_ioctl	= pipe_ioctl,
