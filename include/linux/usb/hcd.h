@@ -379,6 +379,7 @@ struct hc_driver {
 	int	(*disable_usb3_lpm_timeout)(struct usb_hcd *,
 			struct usb_device *, enum usb3_link_state state);
 	int	(*find_raw_port_number)(struct usb_hcd *, int);
+	void	(*change_bus_speed)(struct usb_hcd*, int);
 };
 
 static inline int hcd_giveback_urb_in_bh(struct usb_hcd *hcd)
