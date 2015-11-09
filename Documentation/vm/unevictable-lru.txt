@@ -22,6 +22,7 @@ CONTENTS
      - Filtering special vmas.
      - munlock()/munlockall() system call handling.
      - Migrating mlocked pages.
+     - Compacting mlocked pages.
      - mmap(MAP_LOCKED) system call handling.
      - munmap()/exit()/exec() system call handling.
      - try_to_unmap().
@@ -450,12 +451,29 @@ list because of a race between munlock and migration, page migration uses the
 putback_lru_page() function to add migrated pages back to the LRU.
 
 
+COMPACTING MLOCKED PAGES
+------------------------
+
+The unevictable LRU can be scanned for compactable regions and the default
+behavior is to do so.  /proc/sys/vm/compact_unevictable_allowed controls
+this behavior (see Documentation/sysctl/vm.txt).  Once scanning of the
+unevictable LRU is enabled, the work of compaction is mostly handled by
+the page migration code and the same work flow as described in MIGRATING
+MLOCKED PAGES will apply.
+
+
 mmap(MAP_LOCKED) SYSTEM CALL HANDLING
 -------------------------------------
 
 In addition the mlock()/mlockall() system calls, an application can request
 that a region of memory be mlocked supplying the MAP_LOCKED flag to the mmap()
-call.  Furthermore, any mmap() call or brk() call that expands the heap by a
+call. There is one important and subtle difference here, though. mmap() + mlock()
+will fail if the range cannot be faulted in (e.g. because mm_populate fails)
+and returns with ENOMEM while mmap(MAP_LOCKED) will not fail. The mmaped
+area will still have properties of the locked area - aka. pages will not get
+swapped out - but major page faults to fault memory in might still happen.
+
+Furthermore, any mmap() call or brk() call that expands the heap by a
 task that has previously called mlockall() with the MCL_FUTURE flag will result
 in the newly mapped memory being mlocked.  Before the unevictable/mlock
 changes, the kernel simply called make_pages_present() to allocate pages and
