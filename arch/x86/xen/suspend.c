@@ -11,6 +11,7 @@
 
 #include "xen-ops.h"
 #include "mmu.h"
+#include "pmu.h"
 
 static void xen_pv_pre_suspend(void)
 {
@@ -67,16 +68,26 @@ static void xen_pv_post_suspend(int suspend_cancelled)
 
 void xen_arch_pre_suspend(void)
 {
-    if (xen_pv_domain())
-        xen_pv_pre_suspend();
+	int cpu;
+
+	for_each_online_cpu(cpu)
+		xen_pmu_finish(cpu);
+
+	if (xen_pv_domain())
+		xen_pv_pre_suspend();
 }
 
 void xen_arch_post_suspend(int cancelled)
 {
-    if (xen_pv_domain())
-        xen_pv_post_suspend(cancelled);
-    else
-        xen_hvm_post_suspend(cancelled);
+	int cpu;
+
+	if (xen_pv_domain())
+		xen_pv_post_suspend(cancelled);
+	else
+		xen_hvm_post_suspend(cancelled);
+
+	for_each_online_cpu(cpu)
+		xen_pmu_init(cpu);
 }
 
 static void xen_vcpu_notify_restore(void *data)
@@ -88,7 +99,17 @@ static void xen_vcpu_notify_restore(void *data)
 	tick_resume_local();
 }
 
+static void xen_vcpu_notify_suspend(void *data)
+{
+	tick_suspend_local();
+}
+
 void xen_arch_resume(void)
 {
 	on_each_cpu(xen_vcpu_notify_restore, NULL, 1);
+}
+
+void xen_arch_suspend(void)
+{
+	on_each_cpu(xen_vcpu_notify_suspend, NULL, 1);
 }
