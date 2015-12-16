@@ -29,6 +29,10 @@
 
 #define SC_MEDIA_RSTDIS		(0x530)
 #define SC_MEDIA_RSTEN		(0x52C)
+#define NOC_ADE0_QOSGENERATOR_MODE       0x010C
+#define NOC_ADE0_QOSGENERATOR_EXTCONTROL 0x0118
+#define NOC_ADE1_QOSGENERATOR_MODE       0x020C
+#define NOC_ADE1_QOSGENERATOR_EXTCONTROL 0x0218
 
 enum {
 	LDI_TEST = 0,
@@ -98,6 +102,7 @@ struct hisi_drm_ade_crtc {
 	bool enable;
 	u8 __iomem  *ade_base;
 	u8 __iomem  *media_base;
+	void __iomem  *media_noc_base;
 	u32 ade_core_rate;
 	u32 media_noc_rate;
 	u32 x , y;
@@ -116,6 +121,29 @@ struct hisi_drm_ade_crtc {
 static int hisi_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 					struct drm_framebuffer *old_fb);
 static void ldi_init(struct hisi_drm_ade_crtc *crtc_ade);
+
+void ade_set_medianoc_qos(struct hisi_drm_ade_crtc *crtc_ade)
+{
+	void __iomem *base = crtc_ade->media_noc_base;
+	void __iomem *reg;
+	u32 val;
+
+	reg = base + NOC_ADE0_QOSGENERATOR_MODE;
+	val = (readl(reg) & 0xfffffffc) | 0x2;
+	writel(val, reg);
+
+	reg = base + NOC_ADE0_QOSGENERATOR_EXTCONTROL;
+	val = readl(reg) | 0x1;
+	writel(val, reg);
+
+	reg = base + NOC_ADE1_QOSGENERATOR_MODE;
+	val = (readl(reg) & 0xfffffffc) | 0x2;
+	writel(val, reg);
+
+	reg = base + NOC_ADE1_QOSGENERATOR_EXTCONTROL;
+	val = readl(reg) | 0x1;
+	writel(val, reg);
+}
 
 static void ade_init(struct hisi_drm_ade_crtc *crtc_ade)
 {
@@ -204,6 +232,7 @@ static int hisi_drm_crtc_ade_enable(struct hisi_drm_ade_crtc *crtc_ade)
 		}
 	}
 
+	ade_set_medianoc_qos(crtc_ade);
 	ade_init(crtc_ade);
 	ldi_init(crtc_ade);
 	if (crtc_ade->crtc.primary->fb)
@@ -534,6 +563,13 @@ static int hisi_drm_ade_dts_parse(struct platform_device *pdev,
 	if (IS_ERR(crtc_ade->media_base)) {
 		DRM_ERROR("failed to remap io region1\n");
 		ret = PTR_ERR(crtc_ade->media_base);
+	}
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "media_noc_base");
+	crtc_ade->media_noc_base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(crtc_ade->media_noc_base)) {
+		DRM_ERROR("failed to remap io region1\n");
+		ret = PTR_ERR(crtc_ade->media_noc_base);
 	}
 
 	crtc_ade->ade_core_clk = devm_clk_get(&pdev->dev, "clk_ade_core");

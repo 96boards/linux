@@ -742,9 +742,12 @@
 			ade: ade@f4100000 {
 				compatible = "hisilicon,hi6220-ade";
 				reg = <0x0 0xf4100000 0x0 0x7800>,
-				      <0x0 0xf4410000 0x0 0x1000>;
+				      <0x0 0xf4410000 0x0 0x1000>,
+				      <0x0 0xf4520000 0x0 0x1000>;
 				reg-names = "ade_base",
-					    "media_base";
+					    "media_base",
+					    "media_noc_base";
+
 				clocks = <&clock_media HI6220_ADE_CORE>,
 					 <&clock_media HI6220_CODEC_JPEG>,
 					 <&clock_media HI6220_ADE_PIX_SRC>,
