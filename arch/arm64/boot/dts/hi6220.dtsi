@@ -750,6 +750,8 @@
 
 		 spi_0: spi@f7106000 {
 			compatible = "arm,pl022", "arm,primecell";
+			#address-cells = <1>;
+			#size-cells = <0>;
 			reg = <0x0 0xf7106000 0x0 0x1000>;
 			interrupts = <0 50 4>;
 			bus-id = <0>;
